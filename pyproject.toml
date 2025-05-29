@@ -1,0 +1,18 @@
+[project]
+name = "betarxiv"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "docling",
+    "fastapi[all]",
+    "google-genai",
+    "numpy",
+    "ollama",
+    "pgvector",
+    "psycopg",
+    "pydantic",
+    "python-dotenv",
+    "watchdog",
+]

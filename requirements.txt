@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+psycopg[pool]
+pydantic
+docling
+ollama-python
+watchdog
+numpy
+python-dotenv 
