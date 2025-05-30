@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager
 
 from .db import Database
 from .api import get_router
-from app.watcher import start_watcher
 from ollama import AsyncClient as OllamaAsyncClient
 
 logging.basicConfig(level=logging.INFO)
@@ -49,17 +48,14 @@ MONITOR_DIRECTORY = os.getenv("DIRECTORY", ".")
 async def lifespan(app: FastAPI):
     # Startup
     await db.connect()
-    app.include_router(get_router(db, ollama_client, pdf_queue))
-    loop = asyncio.get_event_loop()
-    loop.create_task(start_watcher(MONITOR_DIRECTORY, pdf_queue))
-    loop.create_task(pdf_processing_worker())
+    app.include_router(get_router(db, ollama_client, None))
     logger.info("Application startup complete.")
     try:
         yield
     finally:
         # Shutdown
         await db.close()
-        await ollama_client.aclose()
+        # await ollama_client.close()
         logger.info("Application shutdown complete.")
 
 
@@ -78,7 +74,6 @@ app.add_middleware(
 
 db = Database(DB_URL)
 ollama_client = OllamaAsyncClient()
-pdf_queue = asyncio.Queue()
 
 
 # @app.on_event("startup")
@@ -97,17 +92,17 @@ pdf_queue = asyncio.Queue()
 #     await ollama_client.aclose()
 
 
-async def pdf_processing_worker():
-    while True:
-        pdf_path = await pdf_queue.get()
-        try:
-            from .paper_processor import process_pdf
+# async def pdf_processing_worker():
+#     while True:
+#         pdf_path = await pdf_queue.get()
+#         try:
+#             from .paper_processor import process_pdf
 
-            paper_data = await process_pdf(pdf_path, ollama_client)
-            paper_id = await db.insert_paper(paper_data)
-            await db.update_paper_status(paper_id, "processed")
-            logger.info(f"Processed and stored paper: {paper_id}")
-        except Exception as e:
-            logger.error(f"Failed to process {pdf_path}: {e}")
-        finally:
-            pdf_queue.task_done()
+#             document_data = await process_pdf(pdf_path, ollama_client)
+#             document_id = await db.insert_document(document_data)
+#             await db.update_paper_status(document_id, "processed")
+#             logger.info(f"Processed and stored document: {document_id}")
+#         except Exception as e:
+#             logger.error(f"Failed to process {pdf_path}: {e}")
+#         finally:
+#             pdf_queue.task_done()
