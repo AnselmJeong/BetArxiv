@@ -15,6 +15,8 @@ import dotenv
 import logging
 from typing import Optional, List
 import re
+import json
+from pydantic import ValidationError
 
 from docling.document_converter import DocumentConverter
 from ollama import AsyncClient as OllamaAsyncClient
@@ -29,6 +31,12 @@ dotenv.load_dotenv()
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 DSN = os.getenv("DATABASE_URL")
@@ -88,6 +96,19 @@ Return only valid JSON matching this schema. Do not include any explanation or e
 Markdown:
 {markdown[:4000]}
 """
+
+    # Default values in case of extraction failure
+    default_metadata = {
+        "title": "Unknown Title",
+        "authors": ["Unknown Author"],
+        "journal_name": None,
+        "volume": None,
+        "issue": None,
+        "year_of_publication": None,
+        "abstract": None,
+        "keywords": [],
+    }
+
     try:
         response = await ollama_client.chat(
             model=OLLAMA_MODEL,
@@ -97,11 +118,50 @@ Markdown:
         )
         raw_content = response["message"]["content"]
         logger.debug(f"LLM raw response: {raw_content}")
-        data = PaperMetadata.model_validate_json(raw_content).model_dump()
-        return data
+
+        # Try to validate with Pydantic
+        try:
+            data = PaperMetadata.model_validate_json(raw_content).model_dump()
+            logger.info("✅ Metadata extraction successful")
+            return data
+        except (ValidationError, json.JSONDecodeError) as validation_error:
+            logger.warning(
+                f"⚠️ JSON validation failed, trying to parse manually: {validation_error}"
+            )
+
+            # Try to parse JSON manually and extract what we can
+            try:
+                raw_data = json.loads(raw_content)
+                extracted_data = {}
+                for key in default_metadata.keys():
+                    extracted_data[key] = raw_data.get(key, default_metadata[key])
+
+                # Ensure authors is a list
+                if not isinstance(extracted_data["authors"], list):
+                    if isinstance(extracted_data["authors"], str):
+                        extracted_data["authors"] = [extracted_data["authors"]]
+                    else:
+                        extracted_data["authors"] = default_metadata["authors"]
+
+                # Ensure keywords is a list
+                if extracted_data["keywords"] and not isinstance(
+                    extracted_data["keywords"], list
+                ):
+                    if isinstance(extracted_data["keywords"], str):
+                        extracted_data["keywords"] = [extracted_data["keywords"]]
+                    else:
+                        extracted_data["keywords"] = []
+
+                logger.info("✅ Partial metadata extraction successful")
+                return extracted_data
+
+            except json.JSONDecodeError:
+                logger.warning("⚠️ Could not parse JSON at all, using defaults")
+                return default_metadata
+
     except Exception as e:
-        logger.error(f"LLM metadata extraction failed: {e}")
-        raise
+        logger.error(f"❌ LLM metadata extraction failed completely: {e}")
+        return default_metadata
 
 
 async def generate_summary(markdown: str, ollama_client: OllamaAsyncClient) -> dict:
@@ -123,6 +183,19 @@ Return only valid JSON matching this schema. Do not include any explanation or e
 Markdown:
 {markdown}
 """
+
+    # Default values in case of extraction failure
+    default_summary = {
+        "summary": "Summary not available due to processing error.",
+        "previous_work": "Previous work analysis not available.",
+        "hypothesis": "Hypothesis not available.",
+        "distinction": "Distinction analysis not available.",
+        "methodology": "Methodology not available.",
+        "results": "Results not available.",
+        "limitations": "Limitations not available.",
+        "implication": "Implications not available.",
+    }
+
     try:
         response = await ollama_client.chat(
             model=OLLAMA_MODEL,
@@ -132,11 +205,34 @@ Markdown:
         )
         raw_content = response["message"]["content"]
         logger.debug(f"LLM raw response (summary): {raw_content}")
-        data = PaperSummary.model_validate_json(raw_content).model_dump()
-        return data
+
+        # Try to validate with Pydantic
+        try:
+            data = PaperSummary.model_validate_json(raw_content).model_dump()
+            logger.info("✅ Summary extraction successful")
+            return data
+        except (ValidationError, json.JSONDecodeError) as validation_error:
+            logger.warning(
+                f"⚠️ Summary JSON validation failed, trying to parse manually: {validation_error}"
+            )
+
+            # Try to parse JSON manually and extract what we can
+            try:
+                raw_data = json.loads(raw_content)
+                extracted_data = {}
+                for key in default_summary.keys():
+                    extracted_data[key] = raw_data.get(key, default_summary[key])
+
+                logger.info("✅ Partial summary extraction successful")
+                return extracted_data
+
+            except json.JSONDecodeError:
+                logger.warning("⚠️ Could not parse summary JSON at all, using defaults")
+                return default_summary
+
     except Exception as e:
-        logger.error(f"LLM section extraction failed: {e}")
-        raise
+        logger.error(f"❌ LLM summary extraction failed completely: {e}")
+        return default_summary
 
 
 async def get_embedding(text: str, ollama_client: OllamaAsyncClient) -> List[float]:
@@ -165,14 +261,18 @@ async def process_pdf(
 ) -> DocumentCreate:
     """Process a PDF file and extract metadata, content, and generate embeddings"""
     pdf_file = Path(pdf_path)
+    base_path = Path(base_dir)
 
-    # Extract folder name from the path using the provided base_dir
+    # Extract folder name and file path relative to base_dir
     try:
-        folder_name = str(pdf_file.parent.relative_to(Path(base_dir)))
+        # Calculate relative paths
+        relative_pdf_path = str(pdf_file.relative_to(base_path))
+        folder_name = str(pdf_file.parent.relative_to(base_path))
         if folder_name == ".":
             folder_name = None
     except ValueError:
-        # PDF is outside the base directory
+        # PDF is outside the base directory - use absolute paths as fallback
+        relative_pdf_path = str(pdf_file)
         folder_name = str(pdf_file.parent)
 
     markdown = await pdf_to_markdown(pdf_path)
@@ -214,7 +314,7 @@ async def process_pdf(
         abstract_embedding=abstract_emb,
         status="processed",
         folder_name=folder_name,
-        url=str(pdf_file),
+        url=relative_pdf_path,
     )
 
 
@@ -232,6 +332,23 @@ async def get_already_ingested_paths(db):
         return set(row["url"] for row in rows if row["url"])
 
 
+def convert_to_relative_paths(absolute_paths, base_dir):
+    """Convert absolute paths to relative paths for comparison"""
+    base_path = Path(base_dir)
+    relative_paths = set()
+
+    for abs_path in absolute_paths:
+        try:
+            # Try to convert to relative path
+            rel_path = str(Path(abs_path).relative_to(base_path))
+            relative_paths.add(rel_path)
+        except ValueError:
+            # If path is outside base_dir, keep as absolute
+            relative_paths.add(abs_path)
+
+    return relative_paths
+
+
 async def main(data_root):
     """Main ingestion function"""
     print(f"[DEBUG] Using DATABASE_URL: {DSN}")
@@ -239,34 +356,86 @@ async def main(data_root):
     await db.connect()
     ollama_client = OllamaAsyncClient()
 
-    all_pdfs = set(await get_all_pdf_paths(data_root))
+    # Get all PDF absolute paths
+    all_pdf_absolute_paths = set(await get_all_pdf_paths(data_root))
     print(
-        f"[DEBUG] Found {len(all_pdfs)} PDFs in '{data_root}' (including subdirectories)"
+        f"[DEBUG] Found {len(all_pdf_absolute_paths)} PDFs in '{data_root}' (including subdirectories)"
     )
 
-    already_ingested = set(await get_already_ingested_paths(db))
-    print(f"[DEBUG] Found {len(already_ingested)} already-ingested PDFs in DB")
+    # Convert to relative paths for comparison with DB
+    all_pdf_relative_paths = convert_to_relative_paths(
+        all_pdf_absolute_paths, data_root
+    )
 
-    new_pdfs = all_pdfs - already_ingested
+    # Get already ingested relative paths from DB
+    already_ingested_relative = set(await get_already_ingested_paths(db))
+    print(f"[DEBUG] Found {len(already_ingested_relative)} already-ingested PDFs in DB")
 
-    if not new_pdfs:
+    # Find new relative paths to process
+    new_relative_paths = all_pdf_relative_paths - already_ingested_relative
+
+    if not new_relative_paths:
         print("No new PDFs to ingest.")
         await db.close()
         return
 
-    print(f"Found {len(new_pdfs)} new PDFs to ingest in '{data_root}'.")
-    for pdf_path in tqdm(sorted(new_pdfs), desc="Ingesting PDFs"):
-        if pdf_path in already_ingested:
-            print(f"⏩ Skipping already ingested: {pdf_path}")
-            continue
+    print(f"Found {len(new_relative_paths)} new PDFs to ingest in '{data_root}'.")
+
+    # Convert back to absolute paths for processing
+    base_path = Path(data_root)
+    new_absolute_paths = []
+    for rel_path in new_relative_paths:
+        if Path(rel_path).is_absolute():
+            # Already absolute path (outside base_dir)
+            new_absolute_paths.append(rel_path)
+        else:
+            # Convert relative to absolute
+            abs_path = str(base_path / rel_path)
+            new_absolute_paths.append(abs_path)
+
+    # Keep track of processing statistics
+    processed_count = 0
+    failed_count = 0
+
+    for pdf_path in tqdm(sorted(new_absolute_paths), desc="Ingesting PDFs"):
         try:
+            logger.info(f"🔄 Processing: {pdf_path}")
             document_data = await process_pdf(pdf_path, ollama_client, data_root)
             document_id = await db.insert_document(document_data)
             await db.update_paper_status(document_id, "processed")
-            # print(f"✅ Ingested: {pdf_path} (ID: {document_id})")
+            processed_count += 1
+            logger.info(f"✅ Successfully ingested: {pdf_path} (ID: {document_id})")
+
         except Exception as e:
-            print(f"❌ Failed to ingest {pdf_path}: {e}")
-            traceback.print_exc()
+            failed_count += 1
+            error_type = type(e).__name__
+
+            # Categorize errors for better debugging
+            if "docling" in str(e).lower() or "convert" in str(e).lower():
+                logger.error(f"📄 PDF conversion failed for {pdf_path}: {e}")
+            elif "ollama" in str(e).lower() or "connection" in str(e).lower():
+                logger.error(f"🤖 LLM service error for {pdf_path}: {e}")
+            elif "database" in str(e).lower() or "postgres" in str(e).lower():
+                logger.error(f"💾 Database error for {pdf_path}: {e}")
+            else:
+                logger.error(f"❌ Unknown error for {pdf_path} ({error_type}): {e}")
+
+            # Print traceback only for debugging (comment out in production)
+            logger.debug(f"Full traceback for {pdf_path}:", exc_info=True)
+
+            # Continue to next file
+            continue
+
+    # Print final statistics
+    total_attempted = processed_count + failed_count
+    print(f"\n📊 Processing Summary:")
+    print(f"   Total attempted: {total_attempted}")
+    print(f"   ✅ Successfully processed: {processed_count}")
+    print(f"   ❌ Failed: {failed_count}")
+
+    if failed_count > 0:
+        success_rate = (processed_count / total_attempted) * 100
+        print(f"   📈 Success rate: {success_rate:.1f}%")
 
     await db.close()
 
