@@ -51,6 +51,9 @@ logger = logging.getLogger(__name__)
 def get_router(db: Database, ollama_client: OllamaAsyncClient, pdf_queue=None):
     router = APIRouter()
 
+    # IMPORTANT: Specific routes must come BEFORE parameterized routes
+    # to avoid route conflicts where 'search', 'folders', etc. are interpreted as document IDs
+
     @router.get("/documents", response_model=DocumentListResponse)
     async def list_documents(
         skip: int = Query(0, ge=0),
@@ -58,60 +61,15 @@ def get_router(db: Database, ollama_client: OllamaAsyncClient, pdf_queue=None):
         filters: Optional[Dict[str, Any]] = None,
         folder_name: Optional[str] = None,
     ):
-        documents, total = await db.list_documents(skip, limit, filters, folder_name)
-        return DocumentListResponse(
-            documents=documents,
-            total=total,
-            skip=skip,
-            limit=limit,
-        )
+        response = await db.list_documents(skip, limit, folder_name, filters)
+        return response
 
     @router.post("/documents", response_model=Document)
     async def create_document(document: DocumentCreate):
         document_id = await db.insert_document(document)
         return await db.get_document(document_id)
 
-    @router.get("/documents/{document_id}", response_model=Document)
-    async def get_document(document_id: UUID = Path(...)):
-        document = await db.get_document(document_id)
-        if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
-        return document
-
-    @router.get("/documents/{document_id}/metadata", response_model=DocumentMetadata)
-    async def get_document_metadata(document_id: UUID = Path(...)):
-        metadata = await db.get_document_metadata(document_id)
-        if not metadata:
-            raise HTTPException(status_code=404, detail="Document not found")
-        return metadata
-
-    @router.get("/documents/{document_id}/summary", response_model=DocumentSummary)
-    async def get_document_summary(document_id: UUID = Path(...)):
-        summary = await db.get_document_summary(document_id)
-        if not summary:
-            raise HTTPException(status_code=404, detail="Document not found")
-        return summary
-
-    @router.patch("/documents/{document_id}/summary", response_model=DocumentSummary)
-    async def update_document_summary(
-        document_id: UUID = Path(...),
-        summary_data: UpdateSummaryRequest = Body(...),
-    ):
-        success = await db.update_document_summary(document_id, summary_data)
-        if not success:
-            raise HTTPException(status_code=404, detail="Document not found")
-        return await db.get_document_summary(document_id)
-
-    @router.patch("/documents/{document_id}/metadata", response_model=DocumentMetadata)
-    async def update_document_metadata(
-        document_id: UUID = Path(...),
-        metadata_data: UpdateMetadataRequest = Body(...),
-    ):
-        success = await db.update_document_metadata(document_id, metadata_data)
-        if not success:
-            raise HTTPException(status_code=404, detail="Document not found")
-        return await db.get_document_metadata(document_id)
-
+    # Search endpoints - must come before {document_id} routes
     @router.get("/documents/search", response_model=SearchResponse)
     async def search_documents(
         query: str = Query(..., min_length=1),
@@ -181,11 +139,13 @@ def get_router(db: Database, ollama_client: OllamaAsyncClient, pdf_queue=None):
             include_snippet,
         )
 
+    # Folders endpoint - must come before {document_id} routes
     @router.get("/documents/folders", response_model=FoldersResponse)
     async def get_folders(base_path: Optional[str] = None):
         folders = await db.get_folders(base_path)
         return FoldersResponse(folders=folders)
 
+    # Status endpoint - must come before {document_id} routes
     @router.get("/documents/status", response_model=StatusResponse)
     async def get_status(document_id: Optional[UUID] = None):
         status = await db.get_status(document_id)
@@ -204,6 +164,84 @@ def get_router(db: Database, ollama_client: OllamaAsyncClient, pdf_queue=None):
                 pending=status_counts.get("pending", 0),
                 errors=status_counts.get("error", 0),
             )
+
+    # Upload endpoint - must come before {document_id} routes
+    @router.post("/documents/upload", response_model=Document)
+    async def upload_paper(file: UploadFile = File(...)):
+        """Upload and process a PDF document"""
+        if not file.filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
+        try:
+            paper_data = await process_pdf(tmp_path, ollama_client)
+            paper_id = await db.insert_document(paper_data)
+            await db.update_paper_status(paper_id, "processed")
+            paper = await db.get_document(paper_id)
+            return paper
+        except Exception as e:
+            logger.error(f"Failed to process PDF: {e}")
+            raise HTTPException(status_code=500, detail="Failed to process PDF.")
+        finally:
+            os.unlink(tmp_path)
+
+    # Process directory endpoint - must come before {document_id} routes
+    @router.post("/documents/process-directory")
+    async def process_directory(background_tasks: BackgroundTasks, directory: Optional[str] = Body(None)):
+        """Process all PDFs in a directory"""
+        from pathlib import Path
+
+        dir_to_scan = directory or os.getenv("DIRECTORY", ".")
+        pdfs = list(Path(dir_to_scan).rglob("*.pdf"))
+        for pdf in pdfs:
+            await pdf_queue.put(str(pdf))
+        return JSONResponse(
+            status_code=202,
+            content={"message": f"Directory processing started for {dir_to_scan}"},
+        )
+
+    # NOW the parameterized routes come AFTER all specific routes
+    @router.get("/documents/{document_id}", response_model=Document)
+    async def get_document(document_id: UUID = Path(...)):
+        document = await db.get_document(document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return document
+
+    @router.get("/documents/{document_id}/metadata", response_model=DocumentMetadata)
+    async def get_document_metadata(document_id: UUID = Path(...)):
+        metadata = await db.get_document_metadata(document_id)
+        if not metadata:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return metadata
+
+    @router.get("/documents/{document_id}/summary", response_model=DocumentSummary)
+    async def get_document_summary(document_id: UUID = Path(...)):
+        summary = await db.get_document_summary(document_id)
+        if not summary:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return summary
+
+    @router.patch("/documents/{document_id}/summary", response_model=DocumentSummary)
+    async def update_document_summary(
+        document_id: UUID = Path(...),
+        summary_data: UpdateSummaryRequest = Body(...),
+    ):
+        success = await db.update_document_summary(document_id, summary_data)
+        if not success:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return await db.get_document_summary(document_id)
+
+    @router.patch("/documents/{document_id}/metadata", response_model=DocumentMetadata)
+    async def update_document_metadata(
+        document_id: UUID = Path(...),
+        metadata_data: UpdateMetadataRequest = Body(...),
+    ):
+        success = await db.update_document_metadata(document_id, metadata_data)
+        if not success:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return await db.get_document_metadata(document_id)
 
     @router.get("/documents/{document_id}/similar", response_model=SimilarDocumentsResponse)
     async def find_similar_documents(
@@ -229,40 +267,6 @@ def get_router(db: Database, ollama_client: OllamaAsyncClient, pdf_queue=None):
             reference_document_id=document_id,
             query_weights={"title": title_weight, "abstract": abstract_weight},
             total_results=len(similar_docs),
-        )
-
-    @router.post("/documents/upload", response_model=Document)
-    async def upload_paper(file: UploadFile = File(...)):
-        """Upload and process a PDF document"""
-        if not file.filename.lower().endswith(".pdf"):
-            raise HTTPException(status_code=400, detail="Only PDF files are supported.")
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            shutil.copyfileobj(file.file, tmp)
-            tmp_path = tmp.name
-        try:
-            paper_data = await process_pdf(tmp_path, ollama_client)
-            paper_id = await db.insert_document(paper_data)
-            await db.update_paper_status(paper_id, "processed")
-            paper = await db.get_document(paper_id)
-            return paper
-        except Exception as e:
-            logger.error(f"Failed to process PDF: {e}")
-            raise HTTPException(status_code=500, detail="Failed to process PDF.")
-        finally:
-            os.unlink(tmp_path)
-
-    @router.post("/documents/process-directory")
-    async def process_directory(background_tasks: BackgroundTasks, directory: Optional[str] = Body(None)):
-        """Process all PDFs in a directory"""
-        from pathlib import Path
-
-        dir_to_scan = directory or os.getenv("DIRECTORY", ".")
-        pdfs = list(Path(dir_to_scan).rglob("*.pdf"))
-        for pdf in pdfs:
-            await pdf_queue.put(str(pdf))
-        return JSONResponse(
-            status_code=202,
-            content={"message": f"Directory processing started for {dir_to_scan}"},
         )
 
     return router

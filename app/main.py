@@ -45,11 +45,40 @@ MONITOR_DIRECTORY = os.getenv("DIRECTORY", ".")
 db = Database(DB_URL)
 ollama_client = OllamaAsyncClient()
 
-# Create FastAPI app
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting application...")
+    try:
+        # Connect to database
+        await db.connect()
+        logger.info("Database connected successfully.")
+
+        # Include the router after database connection
+        app.include_router(get_router(db, ollama_client, None), prefix="/api")
+        logger.info("API routes registered.")
+
+        yield
+    except Exception as e:
+        logger.error(f"Failed to start application: {e}")
+        raise
+    finally:
+        # Shutdown
+        logger.info("Shutting down application...")
+        try:
+            await db.close()
+            logger.info("Database connection closed.")
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
+
+
+# Create FastAPI app with lifespan
 app = FastAPI(
     title="Research Paper Knowledge Extraction API",
     description="Extracts, summarizes, and searches research papers using LLMs and PostgreSQL.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -60,9 +89,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include the router with prefix
-app.include_router(get_router(db, ollama_client, None), prefix="/api")
-
 
 # Add a test endpoint
 @app.get("/")
@@ -70,24 +96,16 @@ async def root():
     return {"message": "Welcome to the Research Paper Knowledge Extraction API"}
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    if not hasattr(app.state, "db"):
-        await db.connect()
-        app.state.db = db
-    logger.info("Application startup complete.")
+# Health check endpoint
+@app.get("/health")
+async def health_check():
     try:
-        yield
-    finally:
-        # Shutdown
-        if hasattr(app.state, "db"):
-            await app.state.db.close()
-        logger.info("Application shutdown complete.")
-
-
-# Set the lifespan
-app.lifespan = lifespan
+        # Simple check to see if database is connected
+        if db.pool is None:
+            return {"status": "unhealthy", "database": "disconnected"}
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
 
 
 # @app.on_event("startup")
