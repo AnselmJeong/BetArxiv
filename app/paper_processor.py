@@ -1,7 +1,5 @@
 import logging
 from typing import Optional, List
-from uuid import UUID
-import asyncio
 from pathlib import Path
 import os
 import re
@@ -15,7 +13,7 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_MODEL = "mistral-small3.1"
+OLLAMA_MODEL = "qwen3:14b"
 OLLAMA_EMBED_MODEL = "nomic-embed-text"  # or another embedding model if available
 
 
@@ -74,6 +72,7 @@ Markdown:
             model=OLLAMA_MODEL,
             messages=[{"role": "user", "content": prompt}],
             format=PaperMetadata.model_json_schema(),
+            think=False,
         )
         raw_content = response["message"]["content"]
         logger.debug(f"LLM raw response: {raw_content}")
@@ -87,7 +86,7 @@ Markdown:
 
 async def generate_summary(markdown: str, ollama_client: OllamaAsyncClient) -> dict:
     # Use a single LLM call to generate all sections in a structured format
-    prompt = """
+    prompt = f"""
 Please analyze the following academic paper thoroughly and provide structured responses to each of the following six aspects in necessary detail. 
 Be precise, concise, and maintain an academic tone:
 1. Summary: Summarize the entire research paper in 10-20 sentences. Focus on the core objective, approach, and findings.
@@ -100,13 +99,16 @@ Be precise, concise, and maintain an academic tone:
 8. Implication: Explain the broader implications of this study for theory, practice, or future research directions.
 
 Return only valid JSON matching this schema. Do not include any explanation or extra text except for the JSON.
+
+Markdown:
+{markdown}
 """
-    full_prompt = f"{prompt}\n\nMarkdown:\n{markdown}"
     try:
         response = await ollama_client.chat(
             model=OLLAMA_MODEL,
-            messages=[{"role": "user", "content": full_prompt}],
+            messages=[{"role": "user", "content": prompt}],
             format=PaperSummary.model_json_schema(),
+            think=False,
         )
         raw_content = response["message"]["content"]
         logger.debug(f"LLM raw response (summary): {raw_content}")
@@ -127,9 +129,7 @@ async def get_embedding(text: str, ollama_client: OllamaAsyncClient) -> List[flo
         raise
 
 
-async def process_pdf(
-    pdf_path: str, ollama_client: OllamaAsyncClient
-) -> DocumentCreate:
+async def process_pdf(pdf_path: str, ollama_client: OllamaAsyncClient) -> DocumentCreate:
     """Process a PDF file and extract metadata, content, and generate embeddings"""
     pdf_file = Path(pdf_path)
 
@@ -162,9 +162,7 @@ async def process_pdf(
         title=meta.get("title", "Unknown"),
         authors=meta.get("authors", []),
         journal_name=meta.get("journal_name"),
-        volume=meta.get("volume"),
-        issue=meta.get("issue"),
-        year_of_publication=meta.get("year_of_publication"),
+        publication_year=meta.get("year_of_publication"),
         abstract=meta.get("abstract"),
         keywords=meta.get("keywords", []),
         markdown=markdown,

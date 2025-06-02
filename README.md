@@ -6,199 +6,271 @@ A FastAPI-based service for extracting, summarizing, and searching research pape
 
 ## Features
 
-- Upload and process research papers (PDFs)
-- Extract metadata and generate summaries using LLMs (Ollama)
-- Store all data and embeddings in PostgreSQL (with pgvector)
-- Monitor a directory for new papers and process them automatically
-- Search, browse, and find similar papers via API
+-   Upload and process research papers (PDFs)
+-   Extract metadata and generate summaries using LLMs (Ollama)
+-   Store all data and embeddings in PostgreSQL (with pgvector)
+-   Monitor a directory for new papers and process them automatically
+-   Search, browse, and find similar papers via API
 
-## Setup
+## API Documentation
 
-### 1. Install Dependencies
+### Document Management
 
-```bash
-pip install -r requirements.txt
+#### List Documents
+
+``` http
+GET /documents
 ```
 
-### 2. Start Ollama and Pull Model
+Query Parameters: - `skip` (int, optional): Number of documents to skip (default: 0) - `limit` (int, optional): Maximum number of documents to return (default: 50, max: 100) - `folder_name` (string, optional): Filter by folder name - `filters` (object, optional): Additional filters (e.g., year, journal)
 
-```bash
-ollama serve
-ollama pull llama3.2
+Response:
+
+``` json
+{
+    "documents": [
+        {
+            "id": "uuid",
+            "title": "string",
+            "authors": ["string"],
+            "journal_name": "string",
+            "year_of_publication": "integer",
+            "abstract": "string",
+            "folder_name": "string"
+        }
+    ],
+    "total": "integer",
+    "skip": "integer",
+    "limit": "integer"
+}
 ```
 
-### 3. Configure PostgreSQL
+#### Get Document
 
-- Enable the `pgvector` extension:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
+``` http
+GET /documents/{document_id}
 ```
 
-- Create the schema:
+Response: Full document details including metadata, summary, and embeddings.
 
-```bash
-psql <your_db_url> -f app/schema.sql
+#### Get Document Summary
+
+``` http
+GET /documents/{document_id}/summary
 ```
 
-### 4. Run the API
+Response:
 
-```bash
-python -m app.main --directory /path/to/papers --db-url postgresql://user:pass@localhost:5432/dbname
+``` json
+{
+    "summary": "string",
+    "distinction": "string",
+    "methodology": "string",
+    "results": "string",
+    "implications": "string"
+}
 ```
 
-Or, for development with auto-reload:
+#### Get Document Metadata
 
-```bash
-uvicorn app.main:app --reload
+``` http
+GET /documents/{document_id}/metadata
 ```
 
-### 5. Access the API
+Response: Document metadata including title, authors, journal, etc.
 
-Visit [http://localhost:8000/docs](http://localhost:8000/docs) for the interactive API docs.
+#### Update Document Summary
 
----
-
-## CLI Options
-
-- `--directory`: Directory to monitor for PDFs (default: current directory)
-- `--db-url`: PostgreSQL connection string
-
----
-
-## Environment Variables
-
-You can also set `DIRECTORY` and `DATABASE_URL` in a `.env` file.
-
----
-
-
-
-
-# How to setup the app
-
-To test your Research Paper Knowledge Extraction API, follow these steps:
-
----
-
-## 1. **Install All Dependencies**
-
-```bash
-pip install -r requirements.txt
+``` http
+PUT /documents/{document_id}/update_summary
 ```
 
----
+Request Body:
 
-## 2. **Start Ollama and Pull the Model**
-
-Make sure [Ollama](https://ollama.com/) is running and the model is pulled:
-
-```bash
-ollama serve
-ollama pull llama3.2
+``` json
+{
+    "summary": "string",
+    "distinction": "string",
+    "methodology": "string",
+    "results": "string",
+    "implications": "string"
+}
 ```
 
----
+#### Update Document Metadata
 
-## 3. **Set Up PostgreSQL**
-
-- Make sure PostgreSQL is running.
-- Enable the `pgvector` extension and create the schema:
-
-```bash
-psql <your_db_url> -c "CREATE EXTENSION IF NOT EXISTS vector;"
-psql <your_db_url> -f app/schema.sql
+``` http
+PUT /documents/{document_id}/update_metadata
 ```
 
-Replace `<your_db_url>` with your actual connection string, e.g.:
-```
-postgresql://user:password@localhost:5432/yourdbname
-```
+Request Body:
 
----
-
-## 4. **Run the FastAPI App**
-
-You can run the app in two ways:
-
-### a) **With Python CLI (directory monitoring enabled):**
-
-```bash
-python -m app.main --directory /path/to/your/papers --db-url postgresql://user:password@localhost:5432/yourdbname
+``` json
+{
+    "title": "string",
+    "authors": ["string"],
+    "journal_name": "string",
+    "year_of_publication": "integer",
+    "abstract": "string",
+    "keywords": ["string"],
+    "volume": "string",
+    "issue": "string"
+}
 ```
 
-### b) **With Uvicorn (for development, hot reload):**
+### Search Functionality
 
-```bash
-uvicorn app.main:app --reload
+#### Semantic Search
+
+``` http
+POST /retrieve/docs
 ```
 
----
+Request Body:
 
-## 5. **Access the API Docs**
-
-Open your browser and go to:
-
+``` json
+{
+    "query": "string",
+    "folder_name": "string",
+    "k": "integer",
+    "filters": {
+        "year_of_publication": "integer",
+        "journal_name": "string",
+        "status": "string"
+    }
+}
 ```
-http://localhost:8000/docs
+
+#### Similar Documents Search
+
+``` http
+GET /documents/{document_id}/similar
 ```
 
-You will see the interactive Swagger UI where you can test all endpoints.
+Query Parameters: - `limit` (int, optional): Maximum results (default: 10, max: 50) - `threshold` (float, optional): Similarity threshold (default: 0.7) - `title_weight` (float, optional): Weight for title similarity (default: 0.75) - `abstract_weight` (float, optional): Weight for abstract similarity (default: 0.25) - `include_snippet` (boolean, optional): Include abstract snippets (default: true) - `folder_name` (string, optional): Filter by folder
 
----
+#### Keyword Search
 
-## 6. **Test the Endpoints**
+``` http
+POST /search/keywords
+```
 
-### a) **Upload a Paper**
+Request Body:
 
-- Use the `/papers/upload` endpoint in the docs.
-- Upload a PDF file.
-- You should get a response with the paper’s metadata and ID.
+``` json
+{
+    "keywords": ["string"],
+    "search_mode": "string",  // "any" or "all"
+    "exact_match": "boolean",
+    "case_sensitive": "boolean",
+    "limit": "integer",
+    "folder_name": "string"
+}
+```
 
-### b) **List Papers**
+#### Combined Search
 
-- Use `/papers` to see all processed papers.
+``` http
+POST /search/combined
+```
 
-### c) **Get Paper Details**
+Request Body:
 
-- Use `/papers/{id}` with a valid paper ID.
+``` json
+{
+    "text_query": "string",
+    "keywords": ["string"],
+    "keyword_mode": "string",  // "any" or "all"
+    "exact_keyword_match": "boolean",
+    "folder_name": "string",
+    "filters": {
+        "year_of_publication": "integer",
+        "journal_name": "string"
+    },
+    "limit": "integer",
+    "include_snippet": "boolean"
+}
+```
 
-### d) **Find Similar Papers**
+### Folder Management
 
-- Use `/papers/{id}/similar` with a valid paper ID.
+#### List Folders
 
-### e) **Trigger Directory Processing**
+``` http
+GET /folders
+```
 
-- Use `/papers/process-directory` to process all PDFs in the monitored directory.
+Response:
 
-### f) **Check Processing Status**
+``` json
+{
+    "folders": [
+        {
+            "name": "string",
+            "path": "string",
+            "document_count": "integer",
+            "subfolders": ["string"]
+        }
+    ]
+}
+```
 
-- Use `/papers/status` to see how many papers are processed, pending, or errored.
+### System Status
 
----
+#### Get Processing Status
 
-## 7. **Monitor Logs**
+``` http
+GET /papers/status
+```
 
-- The app logs to the console. Check for errors or status updates as you test.
+Query Parameters: - `paper_id` (UUID, optional): Check status for specific paper
 
----
+Response:
 
-## 8. **Directory Monitoring**
+``` json
+{
+    "total_documents": "integer",
+    "processed": "integer",
+    "pending": "integer",
+    "errors": "integer"
+}
+```
 
-- If you add new PDFs to the monitored directory, the app will automatically process them in the background.
+## Error Handling
 
----
+The API uses standard HTTP status codes: - 200: Success - 400: Bad Request - 404: Not Found - 500: Internal Server Error
 
-## 9. **Troubleshooting**
+Error responses include a detail message:
 
-- If you get errors, check:
-  - Ollama is running and the model is pulled.
-  - PostgreSQL is running and the schema is created.
-  - The database URL is correct.
-  - The PDF files are valid and not corrupted.
+``` json
+{
+    "detail": "Error message"
+}
+```
 
----
+## Rate Limiting
 
-**You can use tools like [httpie](https://httpie.io/) or `curl` for command-line testing, or just use the Swagger UI at `/docs`.**
+The API implements rate limiting to prevent abuse. Current limits: - 100 requests per minute per IP - 1000 requests per hour per IP
 
-If you want example `curl` commands or a Postman collection, let me know!
+## Authentication
+
+Currently, the API does not implement authentication. It is recommended to: 1. Run the API behind a reverse proxy 2. Implement API key authentication 3. Use HTTPS in production
+
+## Development
+
+### Running Tests
+
+``` bash
+# Create test database
+createdb betarxiv_test
+
+# Install test dependencies
+pip install -r requirements-test.txt
+
+# Run tests
+pytest tests/ -v
+```
+
+### API Testing
+
+You can use the interactive API documentation at: - Swagger UI: `http://localhost:8000/docs` - ReDoc: `http://localhost:8000/redoc`

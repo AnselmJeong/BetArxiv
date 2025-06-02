@@ -4,6 +4,7 @@ from uuid import UUID
 from datetime import datetime
 import os
 from pathlib import Path
+import json
 
 import psycopg
 from psycopg.rows import dict_row
@@ -19,6 +20,8 @@ from .models import (
     FolderInfo,
     UpdateSummaryRequest,
     UpdateMetadataRequest,
+    DocumentListResponse,
+    SearchResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,9 +33,7 @@ class Database:
         self.pool: Optional[psycopg.AsyncConnection] = None
 
     async def connect(self):
-        self.pool = await psycopg.AsyncConnection.connect(
-            self.dsn, autocommit=True, row_factory=dict_row
-        )
+        self.pool = await psycopg.AsyncConnection.connect(self.dsn, autocommit=True, row_factory=dict_row)
         logger.info("Connected to PostgreSQL.")
 
     async def close(self):
@@ -42,74 +43,96 @@ class Database:
 
     # Document operations
     async def insert_document(self, document: DocumentCreate) -> UUID:
+        """Insert a new document into the database."""
         query = """
-        INSERT INTO papers (
-            title, authors, journal_name, volume_issue, publication_year, abstract, keywords,
-            markdown, summary, distinction, methodology, results, implications,
-            title_embedding, abstract_embedding, status, folder_name, url
-        ) VALUES (
-            %(title)s, %(authors)s, %(journal_name)s, %(volume_issue)s, %(year_of_publication)s, %(abstract)s, %(keywords)s,
-            %(markdown)s, %(summary)s, %(distinction)s, %(methodology)s, %(results)s, %(implications)s,
-            %(title_embedding)s, %(abstract_embedding)s, %(status)s, %(folder_name)s, %(url)s
-        ) RETURNING id;
+            INSERT INTO documents (
+                title, authors, journal_name, publication_year, abstract,
+                keywords, volume, issue, url, markdown, summary,
+                distinction, methodology, results, implications,
+                title_embedding, abstract_embedding, status, folder_name
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s
+            ) RETURNING id
         """
-        # Map new field names to database column names
-        document_data = document.model_dump()
-        document_data["volume_issue"] = (
-            f"{document.volume or ''} {document.issue or ''}".strip() or None
-        )
-        document_data["publication_year"] = document.year_of_publication
-
         async with self.pool.cursor() as cur:
-            await cur.execute(query, document_data)
+            await cur.execute(
+                query,
+                (
+                    document.title,
+                    document.authors,
+                    document.journal_name,
+                    document.publication_year,
+                    document.abstract,
+                    document.keywords,
+                    document.volume,
+                    document.issue,
+                    document.url,
+                    document.markdown,
+                    document.summary,
+                    document.distinction,
+                    document.methodology,
+                    document.results,
+                    document.implications,
+                    document.title_embedding,
+                    document.abstract_embedding,
+                    document.status,
+                    document.folder_name,
+                ),
+            )
             row = await cur.fetchone()
             return row["id"]
 
     async def get_document(self, document_id: UUID) -> Optional[Document]:
-        query = "SELECT * FROM papers WHERE id=%s"
-        async with self.pool.cursor() as cur:
-            await cur.execute(query, (str(document_id),))
-            row = await cur.fetchone()
-            if row:
-                # Map database fields to new model fields
-                row_data = dict(row)
-                if row_data.get("publication_year"):
-                    row_data["year_of_publication"] = row_data["publication_year"]
-                if row_data.get("volume_issue"):
-                    parts = row_data["volume_issue"].split(" ", 1)
-                    row_data["volume"] = parts[0] if parts else None
-                    row_data["issue"] = parts[1] if len(parts) > 1 else None
-                return Document(**row_data)
-            return None
-
-    async def get_document_metadata(
-        self, document_id: UUID
-    ) -> Optional[DocumentMetadata]:
+        """Get a document by ID."""
         query = """
-        SELECT title, authors, journal_name, publication_year, abstract, keywords, 
-               volume_issue, url, markdown 
-        FROM papers WHERE id=%s
+            SELECT id, title, authors, journal_name, publication_year,
+                   abstract, keywords, volume, issue, url, markdown,
+                   summary, distinction, methodology, results, implications,
+                   title_embedding, abstract_embedding, status, folder_name
+            FROM documents
+            WHERE id = %s
         """
         async with self.pool.cursor() as cur:
             await cur.execute(query, (str(document_id),))
             row = await cur.fetchone()
             if row:
-                row_data = dict(row)
-                row_data["year_of_publication"] = row_data.pop("publication_year", None)
-                if row_data.get("volume_issue"):
-                    parts = row_data["volume_issue"].split(" ", 1)
-                    row_data["volume"] = parts[0] if parts else None
-                    row_data["issue"] = parts[1] if len(parts) > 1 else None
-                row_data.pop("volume_issue", None)
-                return DocumentMetadata(**row_data)
+                row_dict = dict(row)
+                # Parse embeddings from JSON strings if they exist
+                if row_dict.get("title_embedding"):
+                    row_dict["title_embedding"] = (
+                        json.loads(row_dict["title_embedding"])
+                        if isinstance(row_dict["title_embedding"], str)
+                        else row_dict["title_embedding"]
+                    )
+                if row_dict.get("abstract_embedding"):
+                    row_dict["abstract_embedding"] = (
+                        json.loads(row_dict["abstract_embedding"])
+                        if isinstance(row_dict["abstract_embedding"], str)
+                        else row_dict["abstract_embedding"]
+                    )
+                return Document(**row_dict)
             return None
 
-    async def get_document_summary(
-        self, document_id: UUID
-    ) -> Optional[DocumentSummary]:
+    async def get_document_metadata(self, document_id: UUID) -> Optional[DocumentMetadata]:
+        """Get document metadata by ID."""
+        query = """
+            SELECT title, authors, journal_name, publication_year,
+                   abstract, keywords, volume, issue, url, markdown
+            FROM documents
+            WHERE id = %s
+        """
+        async with self.pool.cursor() as cur:
+            await cur.execute(query, (str(document_id),))
+            row = await cur.fetchone()
+            if row:
+                return DocumentMetadata(**dict(row))
+            return None
+
+    async def get_document_summary(self, document_id: UUID) -> Optional[DocumentSummary]:
         query = """
         SELECT summary, distinction, methodology, results, implications 
-        FROM papers WHERE id=%s
+        FROM documents WHERE id=%s
         """
         async with self.pool.cursor() as cur:
             await cur.execute(query, (str(document_id),))
@@ -118,20 +141,30 @@ class Database:
                 return DocumentSummary(**row)
             return None
 
-    async def get_document_embedding(
-        self, document_id: UUID
-    ) -> Optional[DocumentEmbedding]:
-        query = "SELECT title_embedding, abstract_embedding FROM papers WHERE id=%s"
+    async def get_document_embedding(self, document_id: UUID) -> Optional[DocumentEmbedding]:
+        query = "SELECT title_embedding, abstract_embedding FROM documents WHERE id=%s"
         async with self.pool.cursor() as cur:
             await cur.execute(query, (str(document_id),))
             row = await cur.fetchone()
             if row:
-                return DocumentEmbedding(**row)
+                row_dict = dict(row)
+                # Parse embeddings from JSON strings if they exist
+                if row_dict.get("title_embedding"):
+                    row_dict["title_embedding"] = (
+                        json.loads(row_dict["title_embedding"])
+                        if isinstance(row_dict["title_embedding"], str)
+                        else row_dict["title_embedding"]
+                    )
+                if row_dict.get("abstract_embedding"):
+                    row_dict["abstract_embedding"] = (
+                        json.loads(row_dict["abstract_embedding"])
+                        if isinstance(row_dict["abstract_embedding"], str)
+                        else row_dict["abstract_embedding"]
+                    )
+                return DocumentEmbedding(**row_dict)
             return None
 
-    async def update_document_summary(
-        self, document_id: UUID, summary_data: UpdateSummaryRequest
-    ) -> bool:
+    async def update_document_summary(self, document_id: UUID, summary_data: UpdateSummaryRequest) -> bool:
         fields = []
         values = []
         for field, value in summary_data.model_dump(exclude_unset=True).items():
@@ -142,46 +175,27 @@ class Database:
         if not fields:
             return False
 
-        query = f"UPDATE papers SET {', '.join(fields)}, updated_at=NOW() WHERE id=%s"
+        query = f"UPDATE documents SET {', '.join(fields)}, updated_at=NOW() WHERE id=%s"
         values.append(str(document_id))
 
         async with self.pool.cursor() as cur:
             await cur.execute(query, values)
             return cur.rowcount > 0
 
-    async def update_document_metadata(
-        self, document_id: UUID, metadata_data: UpdateMetadataRequest
-    ) -> bool:
+    async def update_document_metadata(self, document_id: UUID, metadata_data: UpdateMetadataRequest) -> bool:
         data = metadata_data.model_dump(exclude_unset=True)
         fields = []
         values = []
 
         for field, value in data.items():
             if value is not None:
-                if field == "year_of_publication":
-                    fields.append("publication_year=%s")
-                    values.append(value)
-                elif field in ["volume", "issue"]:
-                    # Handle volume/issue special case - we'll need to read current value first
-                    continue
-                else:
-                    fields.append(f"{field}=%s")
-                    values.append(value)
-
-        # Handle volume/issue update
-        if "volume" in data or "issue" in data:
-            current_doc = await self.get_document(document_id)
-            if current_doc:
-                new_volume = data.get("volume", current_doc.volume or "")
-                new_issue = data.get("issue", current_doc.issue or "")
-                volume_issue = f"{new_volume} {new_issue}".strip() or None
-                fields.append("volume_issue=%s")
-                values.append(volume_issue)
+                fields.append(f"{field}=%s")
+                values.append(value)
 
         if not fields:
             return False
 
-        query = f"UPDATE papers SET {', '.join(fields)}, updated_at=NOW() WHERE id=%s"
+        query = f"UPDATE documents SET {', '.join(fields)}, updated_at=NOW() WHERE id=%s"
         values.append(str(document_id))
 
         async with self.pool.cursor() as cur:
@@ -192,11 +206,12 @@ class Database:
         self,
         skip: int = 0,
         limit: int = 50,
-        filters: Optional[Dict[str, Any]] = None,
         folder_name: Optional[str] = None,
-    ) -> tuple[List[DocumentListItem], int]:
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> DocumentListResponse:
+        """List documents with optional filtering."""
         where_conditions = []
-        params: List[Any] = []
+        params = []
 
         if folder_name:
             where_conditions.append("folder_name = %s")
@@ -204,57 +219,39 @@ class Database:
 
         if filters:
             for key, value in filters.items():
-                if key == "year_of_publication":
-                    where_conditions.append("publication_year = %s")
-                    params.append(value)
-                elif key == "search":
-                    where_conditions.append(
-                        "(LOWER(title) LIKE %s OR %s = ANY(LOWER(authors)) OR %s = ANY(LOWER(keywords)))"
-                    )
-                    search_term = f"%{value.lower()}%"
-                    params.extend([search_term, value.lower(), value.lower()])
-                elif key in ["journal_name", "status"]:
+                if key in ["title", "authors", "journal_name", "publication_year", "keywords"]:
                     where_conditions.append(f"{key} = %s")
                     params.append(value)
 
-        where_clause = (
-            f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
-        )
+        where_clause = f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
 
-        count_query = f"SELECT COUNT(*) FROM papers {where_clause}"
+        count_query = f"SELECT COUNT(*) FROM documents {where_clause}"
         query = f"""
-            SELECT id, title, authors, journal_name, publication_year as year_of_publication, 
+            SELECT id, title, authors, journal_name, publication_year,
                    abstract, folder_name
-            FROM papers {where_clause}
-            ORDER BY created_at DESC
+            FROM documents
+            {where_clause}
+            ORDER BY publication_year DESC, title
             LIMIT %s OFFSET %s
         """
 
-        params_count = params.copy()
-        params.extend([limit, skip])
-
         async with self.pool.cursor() as cur:
-            await cur.execute(count_query, params_count)
-            total = (await cur.fetchone())["count"]
-            await cur.execute(query, params)
+            await cur.execute(count_query, params)
+            total_row = await cur.fetchone()
+            total = total_row["count"]
+
+            await cur.execute(query, params + [limit, skip])
             rows = await cur.fetchall()
-            documents = [DocumentListItem(**row) for row in rows]
-            return documents, total
+            documents = [DocumentListItem(**dict(row)) for row in rows]
+
+            return DocumentListResponse(documents=documents, total=total, skip=skip, limit=limit)
 
     async def search_documents(
-        self,
-        query: str,
-        folder_name: Optional[str] = None,
-        k: int = 4,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
-        # For now, implement a simple text-based search
-        # TODO: Implement semantic search using embeddings
-        where_conditions = [
-            "(LOWER(title) LIKE %s OR LOWER(abstract) LIKE %s OR %s = ANY(LOWER(authors)) OR %s = ANY(LOWER(keywords)))"
-        ]
-        search_term = f"%{query.lower()}%"
-        params = [search_term, search_term, query.lower(), query.lower()]
+        self, query: str, folder_name: Optional[str] = None, k: int = 4, filters: Optional[Dict[str, Any]] = None
+    ) -> SearchResponse:
+        """Search documents using text similarity."""
+        where_conditions = []
+        params = [query]
 
         if folder_name:
             where_conditions.append("folder_name = %s")
@@ -262,155 +259,71 @@ class Database:
 
         if filters:
             for key, value in filters.items():
-                if key == "year_of_publication":
-                    where_conditions.append("publication_year = %s")
-                    params.append(value)
-                elif key in ["journal_name", "status"]:
+                if key in ["title", "authors", "journal_name", "publication_year", "keywords"]:
                     where_conditions.append(f"{key} = %s")
                     params.append(value)
 
-        where_clause = f"WHERE {' AND '.join(where_conditions)}"
+        where_clause = f"AND {' AND '.join(where_conditions)}" if where_conditions else ""
+
         search_query = f"""
-            SELECT id, title, authors, abstract,
-                   1.0 as similarity_score,
-                   SUBSTRING(abstract, 1, 200) as snippet
-            FROM papers {where_clause}
-            ORDER BY created_at DESC
+            SELECT id, title, authors,
+                   (
+                       CASE WHEN title ILIKE %s THEN 0.8 ELSE 0 END +
+                       CASE WHEN abstract ILIKE %s THEN 0.5 ELSE 0 END +
+                       CASE WHEN EXISTS (SELECT 1 FROM unnest(authors) a WHERE a ILIKE %s) THEN 0.3 ELSE 0 END
+                   ) as similarity_score
+            FROM documents
+            WHERE (title ILIKE %s OR abstract ILIKE %s OR EXISTS (SELECT 1 FROM unnest(authors) a WHERE a ILIKE %s))
+            {where_clause}
+            ORDER BY similarity_score DESC
             LIMIT %s
         """
-        params.append(k)
+
+        search_term = f"%{query}%"
+        search_params = (
+            [search_term, search_term, search_term, search_term, search_term, search_term] + params[1:] + [k]
+        )
 
         async with self.pool.cursor() as cur:
-            await cur.execute(search_query, params)
+            await cur.execute(search_query, search_params)
             rows = await cur.fetchall()
-            return [
+
+            results = [
                 SearchResult(
-                    id=row["id"],
-                    title=row["title"],
-                    authors=row["authors"],
-                    similarity_score=row["similarity_score"],
-                    snippet=row["snippet"],
+                    id=row["id"], title=row["title"], authors=row["authors"], similarity_score=row["similarity_score"]
                 )
                 for row in rows
             ]
 
-    async def get_folders(self, base_path: Optional[str] = None) -> List[FolderInfo]:
-        # Get distinct folder names from database
-        query = """
-        SELECT folder_name, COUNT(*) as document_count 
-        FROM papers 
-        WHERE folder_name IS NOT NULL 
-        GROUP BY folder_name
-        ORDER BY folder_name
-        """
+            return SearchResponse(results=results, query=query, total_results=len(results))
 
+    async def get_folders(self, base_path: Optional[str] = None) -> List[FolderInfo]:
+        query = "SELECT DISTINCT folder_name FROM documents WHERE folder_name IS NOT NULL"
         async with self.pool.cursor() as cur:
             await cur.execute(query)
             rows = await cur.fetchall()
-
             folders = []
             for row in rows:
                 folder_name = row["folder_name"]
-                folders.append(
-                    FolderInfo(
-                        name=folder_name,
-                        path=folder_name,  # Assuming folder_name contains the path
-                        document_count=row["document_count"],
-                        subfolders=[],  # TODO: Implement subfolder detection
-                    )
-                )
-
+                if base_path:
+                    folder_path = os.path.join(base_path, folder_name)
+                else:
+                    folder_path = folder_name
+                folders.append(FolderInfo(name=folder_name, path=folder_path))
             return folders
 
-    # Legacy methods for backward compatibility
-    async def insert_paper(self, paper: DocumentCreate) -> UUID:
-        return await self.insert_document(paper)
-
-    async def update_paper_status(self, paper_id: UUID, status: str):
-        query = "UPDATE papers SET status=%s, updated_at=NOW() WHERE id=%s"
-        async with self.pool.cursor() as cur:
-            await cur.execute(query, (status, str(paper_id)))
-
-    async def get_paper(self, paper_id: UUID) -> Optional[Document]:
-        return await self.get_document(paper_id)
-
-    async def list_papers(
-        self, page: int, per_page: int, search: Optional[str], year: Optional[int]
-    ) -> tuple[List[DocumentListItem], int]:
-        skip = (page - 1) * per_page
-        filters = {}
-        if search:
-            filters["search"] = search
-        if year:
-            filters["year_of_publication"] = year
-
-        documents, total = await self.list_documents(
-            skip=skip, limit=per_page, filters=filters
-        )
-        return documents, total
-
-    async def get_similar_papers(
-        self, paper_id: UUID, limit: int, threshold: float
-    ) -> List[dict]:
-        # Get the reference embeddings
-        query = "SELECT title_embedding, abstract_embedding FROM papers WHERE id=%s"
-        async with self.pool.cursor() as cur:
-            await cur.execute(query, (str(paper_id),))
-            row = await cur.fetchone()
-            if not row:
-                return []
-            title_emb, abstract_emb = row["title_embedding"], row["abstract_embedding"]
-            # Find similar papers using cosine similarity (pgvector)
-            sim_query = """
-            SELECT id, title, authors,
-                (1 - (title_embedding <=> %s) + 1 - (abstract_embedding <=> %s))/2 AS similarity_score
-            FROM papers
-            WHERE id != %s
-            ORDER BY similarity_score DESC
-            LIMIT %s
-            """
-            await cur.execute(
-                sim_query, (title_emb, abstract_emb, str(paper_id), limit)
-            )
-            results = await cur.fetchall()
-            return [
-                {
-                    "id": r["id"],
-                    "title": r["title"],
-                    "authors": r["authors"],
-                    "similarity_score": float(r["similarity_score"]),
-                }
-                for r in results
-                if r["similarity_score"] >= threshold
-            ]
-
-    async def get_status(self, paper_id: Optional[UUID] = None):
-        async with self.pool.cursor() as cur:
-            if paper_id:
-                await cur.execute(
-                    "SELECT status FROM papers WHERE id=%s", (str(paper_id),)
-                )
+    async def get_status(self, document_id: Optional[UUID] = None):
+        if document_id:
+            query = "SELECT status FROM documents WHERE id=%s"
+            async with self.pool.cursor() as cur:
+                await cur.execute(query, (str(document_id),))
                 row = await cur.fetchone()
-                if row:
-                    return {"status": row["status"]}
-                return None
-            else:
-                await cur.execute("SELECT COUNT(*) FROM papers")
-                total = (await cur.fetchone())["count"]
-                await cur.execute(
-                    "SELECT COUNT(*) FROM papers WHERE status='processed'"
-                )
-                processed = (await cur.fetchone())["count"]
-                await cur.execute("SELECT COUNT(*) FROM papers WHERE status='pending'")
-                pending = (await cur.fetchone())["count"]
-                await cur.execute("SELECT COUNT(*) FROM papers WHERE status='error'")
-                errors = (await cur.fetchone())["count"]
-                return {
-                    "total_documents": total,
-                    "processed": processed,
-                    "pending": pending,
-                    "errors": errors,
-                }
+                return row["status"] if row else None
+        else:
+            query = "SELECT status, COUNT(*) as count FROM documents GROUP BY status"
+            async with self.pool.cursor() as cur:
+                await cur.execute(query)
+                return await cur.fetchall()
 
     async def find_similar_documents(
         self,
@@ -422,110 +335,22 @@ class Database:
         include_snippet: bool = True,
         folder_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Find similar documents using weighted embedding similarity.
+        # Get the reference document's embeddings
+        ref_doc = await self.get_document_embedding(document_id)
+        if not ref_doc or not ref_doc.title_embedding or not ref_doc.abstract_embedding:
+            return []
 
-        Args:
-            document_id: ID of the reference document
-            limit: Maximum number of results to return
-            threshold: Minimum similarity score threshold
-            title_weight: Weight for title embedding similarity (default 0.75 for 3:1 ratio)
-            abstract_weight: Weight for abstract embedding similarity (default 0.25)
-            include_snippet: Whether to include abstract snippets
-            folder_name: Optional folder to limit search scope
-
-        Returns:
-            List of similar documents with weighted similarity scores
-        """
-        # Normalize weights to ensure they sum to 1
-        total_weight = title_weight + abstract_weight
-        if total_weight > 0:
-            title_weight = title_weight / total_weight
-            abstract_weight = abstract_weight / total_weight
-        else:
-            title_weight, abstract_weight = 0.5, 0.5
-
-        # Get the reference embeddings
-        query = """
-        SELECT title_embedding, abstract_embedding, title, abstract 
-        FROM papers WHERE id=%s
-        """
-        async with self.pool.cursor() as cur:
-            await cur.execute(query, (str(document_id),))
-            row = await cur.fetchone()
-            if not row:
-                return []
-
-            ref_title_emb = row["title_embedding"]
-            ref_abstract_emb = row["abstract_embedding"]
-
-            if not ref_title_emb or not ref_abstract_emb:
-                return []
-
-            # Build the similarity query with optional folder filtering
-            where_conditions = [
-                "id != %s",
-                "title_embedding IS NOT NULL",
-                "abstract_embedding IS NOT NULL",
-            ]
-            params = [str(document_id)]
-
-            if folder_name:
-                where_conditions.append("folder_name = %s")
-                params.append(folder_name)
-
-            where_clause = f"WHERE {' AND '.join(where_conditions)}"
-
-            # Build the SELECT fields
-            select_fields = [
-                "id",
-                "title",
-                "authors",
-                "folder_name",
-                f"(1 - (title_embedding <=> %s)) AS title_similarity",
-                f"(1 - (abstract_embedding <=> %s)) AS abstract_similarity",
-                f"({title_weight} * (1 - (title_embedding <=> %s)) + {abstract_weight} * (1 - (abstract_embedding <=> %s))) AS similarity_score",
-            ]
-
-            if include_snippet:
-                select_fields.append("SUBSTRING(abstract, 1, 200) as snippet")
-
-            # Execute the similarity search
-            sim_query = f"""
-            SELECT {", ".join(select_fields)}
-            FROM papers 
-            {where_clause}
-            HAVING similarity_score >= %s
-            ORDER BY similarity_score DESC
-            LIMIT %s
-            """
-
-            # Parameters: ref_title_emb (3x), ref_abstract_emb (3x), threshold, limit
-            search_params = params + [
-                ref_title_emb,  # for title_similarity
-                ref_abstract_emb,  # for abstract_similarity
-                ref_title_emb,  # for weighted similarity_score
-                ref_abstract_emb,  # for weighted similarity_score
-                threshold,  # for HAVING clause
-                limit,  # for LIMIT
-            ]
-
-            await cur.execute(sim_query, search_params)
-            results = await cur.fetchall()
-
-            return [
-                {
-                    "id": r["id"],
-                    "title": r["title"],
-                    "authors": r["authors"],
-                    "similarity_score": float(r["similarity_score"]),
-                    "title_similarity": float(r["title_similarity"]),
-                    "abstract_similarity": float(r["abstract_similarity"]),
-                    "snippet": r.get("snippet") if include_snippet else None,
-                    "folder_name": r["folder_name"],
-                }
-                for r in results
-            ]
+        return await self.find_similar_documents_by_embeddings(
+            ref_doc.title_embedding,
+            ref_doc.abstract_embedding,
+            limit=limit,
+            threshold=threshold,
+            title_weight=title_weight,
+            abstract_weight=abstract_weight,
+            include_snippet=include_snippet,
+            folder_name=folder_name,
+            exclude_document_id=document_id,
+        )
 
     async def find_similar_documents_by_embeddings(
         self,
@@ -539,101 +364,50 @@ class Database:
         folder_name: Optional[str] = None,
         exclude_document_id: Optional[UUID] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Find similar documents using provided embeddings (useful for search queries).
-
-        Args:
-            title_embedding: Title embedding vector
-            abstract_embedding: Abstract embedding vector
-            limit: Maximum number of results
-            threshold: Minimum similarity threshold
-            title_weight: Weight for title similarity (default 0.75 for 3:1 ratio)
-            abstract_weight: Weight for abstract similarity (default 0.25)
-            include_snippet: Whether to include snippets
-            folder_name: Optional folder filter
-            exclude_document_id: Optional document ID to exclude from results
-
-        Returns:
-            List of similar documents with weighted similarity scores
-        """
-        # Normalize weights
-        total_weight = title_weight + abstract_weight
-        if total_weight > 0:
-            title_weight = title_weight / total_weight
-            abstract_weight = abstract_weight / total_weight
-        else:
-            title_weight, abstract_weight = 0.5, 0.5
-
-        # Build where conditions
-        where_conditions = [
-            "title_embedding IS NOT NULL",
-            "abstract_embedding IS NOT NULL",
-        ]
-        params = []
+        where_conditions = ["title_embedding IS NOT NULL AND abstract_embedding IS NOT NULL"]
+        where_params = []
 
         if folder_name:
             where_conditions.append("folder_name = %s")
-            params.append(folder_name)
+            where_params.append(folder_name)
 
         if exclude_document_id:
             where_conditions.append("id != %s")
-            params.append(str(exclude_document_id))
+            where_params.append(str(exclude_document_id))
 
-        where_clause = (
-            f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
-        )
+        where_clause = f"WHERE {' AND '.join(where_conditions)}"
 
-        # Build SELECT fields
-        select_fields = [
-            "id",
-            "title",
-            "authors",
-            "folder_name",
-            f"(1 - (title_embedding <=> %s)) AS title_similarity",
-            f"(1 - (abstract_embedding <=> %s)) AS abstract_similarity",
-            f"({title_weight} * (1 - (title_embedding <=> %s)) + {abstract_weight} * (1 - (abstract_embedding <=> %s))) AS similarity_score",
-        ]
-
-        if include_snippet:
-            select_fields.append("SUBSTRING(abstract, 1, 200) as snippet")
-
-        # Execute query
-        search_query = f"""
-        SELECT {", ".join(select_fields)}
-        FROM papers 
-        {where_clause}
-        HAVING similarity_score >= %s
-        ORDER BY similarity_score DESC
-        LIMIT %s
+        query = f"""
+            WITH similarity_scores AS (
+                SELECT 
+                    id,
+                    title,
+                    abstract,
+                    authors,
+                    journal_name,
+                    publication_year,
+                    folder_name,
+                    (
+                        {title_weight} * (1 - (title_embedding <=> %s::vector)) +
+                        {abstract_weight} * (1 - (abstract_embedding <=> %s::vector))
+                    ) as similarity
+                FROM documents
+                {where_clause}
+            )
+            SELECT *
+            FROM similarity_scores
+            WHERE similarity >= %s
+            ORDER BY similarity DESC
+            LIMIT %s
         """
 
-        # Parameters: where params + embeddings (4x) + threshold + limit
-        search_params = params + [
-            title_embedding,  # for title_similarity
-            abstract_embedding,  # for abstract_similarity
-            title_embedding,  # for weighted similarity_score
-            abstract_embedding,  # for weighted similarity_score
-            threshold,  # for HAVING clause
-            limit,  # for LIMIT
-        ]
+        # Proper parameter order: embeddings first, then threshold, limit, then where clause params
+        params = [title_embedding, abstract_embedding] + where_params + [threshold, limit]
 
         async with self.pool.cursor() as cur:
-            await cur.execute(search_query, search_params)
-            results = await cur.fetchall()
-
-            return [
-                {
-                    "id": r["id"],
-                    "title": r["title"],
-                    "authors": r["authors"],
-                    "similarity_score": float(r["similarity_score"]),
-                    "title_similarity": float(r["title_similarity"]),
-                    "abstract_similarity": float(r["abstract_similarity"]),
-                    "snippet": r.get("snippet") if include_snippet else None,
-                    "folder_name": r["folder_name"],
-                }
-                for r in results
-            ]
+            await cur.execute(query, params)
+            rows = await cur.fetchall()
+            return [dict(row) for row in rows]
 
     async def search_by_keywords(
         self,
@@ -645,172 +419,50 @@ class Database:
         limit: int = 50,
         include_snippet: bool = True,
     ) -> List[Dict[str, Any]]:
-        """
-        Search documents by keywords with flexible matching options.
-
-        Args:
-            keywords: List of keywords to search for
-            search_mode: "any" for OR logic, "all" for AND logic
-            exact_match: Whether to use exact keyword matching
-            case_sensitive: Whether search is case sensitive
-            folder_name: Optional folder to limit search
-            limit: Maximum number of results
-            include_snippet: Whether to include abstract snippets
-
-        Returns:
-            List of documents matching the keyword criteria
-        """
-        if not keywords:
-            return []
-
-        # Prepare keywords for search
-        if case_sensitive:
-            search_keywords = keywords
-        else:
-            search_keywords = [kw.lower() for kw in keywords]
-
-        # Build WHERE conditions
-        where_conditions = ["keywords IS NOT NULL"]
+        where_conditions = []
         params = []
+
+        # Build keyword search conditions
+        keyword_conditions = []
+        for keyword in keywords:
+            if exact_match:
+                if case_sensitive:
+                    keyword_conditions.append("EXISTS (SELECT 1 FROM unnest(keywords) k WHERE k = %s)")
+                else:
+                    keyword_conditions.append("EXISTS (SELECT 1 FROM unnest(keywords) k WHERE LOWER(k) = LOWER(%s))")
+            else:
+                if case_sensitive:
+                    keyword_conditions.append("EXISTS (SELECT 1 FROM unnest(keywords) k WHERE k LIKE %s)")
+                else:
+                    keyword_conditions.append("EXISTS (SELECT 1 FROM unnest(keywords) k WHERE LOWER(k) LIKE LOWER(%s))")
+            params.append(f"%{keyword}%" if not exact_match else keyword)
+
+        if search_mode == "all":
+            where_conditions.append(f"({' AND '.join(keyword_conditions)})")
+        else:  # "any"
+            where_conditions.append(f"({' OR '.join(keyword_conditions)})")
 
         if folder_name:
             where_conditions.append("folder_name = %s")
             params.append(folder_name)
 
-        # Build keyword search condition
-        if exact_match:
-            if search_mode == "all":
-                # All keywords must be present (exact match)
-                keyword_conditions = []
-                for keyword in search_keywords:
-                    if case_sensitive:
-                        keyword_conditions.append("%s = ANY(keywords)")
-                    else:
-                        keyword_conditions.append(
-                            "%s = ANY(ARRAY(SELECT LOWER(unnest(keywords))))"
-                        )
-                    params.append(keyword)
-                where_conditions.append(f"({' AND '.join(keyword_conditions)})")
-            else:
-                # Any keyword can be present (exact match)
-                if case_sensitive:
-                    where_conditions.append("keywords && %s")
-                    params.append(search_keywords)
-                else:
-                    where_conditions.append(
-                        "ARRAY(SELECT LOWER(unnest(keywords))) && %s"
-                    )
-                    params.append(search_keywords)
-        else:
-            # Fuzzy matching within keywords
-            if search_mode == "all":
-                # All keywords must match (fuzzy)
-                keyword_conditions = []
-                for keyword in search_keywords:
-                    if case_sensitive:
-                        keyword_conditions.append(
-                            "EXISTS(SELECT 1 FROM unnest(keywords) AS kw WHERE kw LIKE %s)"
-                        )
-                        params.append(f"%{keyword}%")
-                    else:
-                        keyword_conditions.append(
-                            "EXISTS(SELECT 1 FROM unnest(keywords) AS kw WHERE LOWER(kw) LIKE %s)"
-                        )
-                        params.append(f"%{keyword}%")
-                where_conditions.append(f"({' AND '.join(keyword_conditions)})")
-            else:
-                # Any keyword can match (fuzzy)
-                keyword_conditions = []
-                for keyword in search_keywords:
-                    if case_sensitive:
-                        keyword_conditions.append(
-                            "EXISTS(SELECT 1 FROM unnest(keywords) AS kw WHERE kw LIKE %s)"
-                        )
-                        params.append(f"%{keyword}%")
-                    else:
-                        keyword_conditions.append(
-                            "EXISTS(SELECT 1 FROM unnest(keywords) AS kw WHERE LOWER(kw) LIKE %s)"
-                        )
-                        params.append(f"%{keyword}%")
-                where_conditions.append(f"({' OR '.join(keyword_conditions)})")
+        where_clause = f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
 
-        where_clause = f"WHERE {' AND '.join(where_conditions)}"
-
-        # Build SELECT fields
-        select_fields = [
-            "id",
-            "title",
-            "authors",
-            "keywords",
-            "folder_name",
-            "abstract",
-        ]
-
-        if include_snippet:
-            select_fields.append("SUBSTRING(abstract, 1, 200) as snippet")
-
-        # Execute query
         query = f"""
-        SELECT {", ".join(select_fields)}
-        FROM papers 
-        {where_clause}
-        ORDER BY created_at DESC
-        LIMIT %s
+            SELECT 
+                id, title, authors, journal_name, publication_year,
+                abstract, keywords, folder_name
+            FROM documents
+            {where_clause}
+            ORDER BY created_at DESC
+            LIMIT %s
         """
-
         params.append(limit)
 
         async with self.pool.cursor() as cur:
             await cur.execute(query, params)
-            results = await cur.fetchall()
-
-            # Calculate match scores and matched keywords
-            processed_results = []
-            for r in results:
-                doc_keywords = r["keywords"] or []
-
-                # Find matched keywords
-                matched_keywords = []
-                for query_kw in keywords:
-                    for doc_kw in doc_keywords:
-                        if exact_match:
-                            if case_sensitive:
-                                if query_kw == doc_kw:
-                                    matched_keywords.append(doc_kw)
-                            else:
-                                if query_kw.lower() == doc_kw.lower():
-                                    matched_keywords.append(doc_kw)
-                        else:
-                            if case_sensitive:
-                                if query_kw in doc_kw:
-                                    matched_keywords.append(doc_kw)
-                            else:
-                                if query_kw.lower() in doc_kw.lower():
-                                    matched_keywords.append(doc_kw)
-
-                # Remove duplicates while preserving order
-                matched_keywords = list(dict.fromkeys(matched_keywords))
-
-                # Calculate match score
-                match_score = len(matched_keywords) / len(keywords) if keywords else 0.0
-
-                processed_results.append(
-                    {
-                        "id": r["id"],
-                        "title": r["title"],
-                        "authors": r["authors"],
-                        "keywords": doc_keywords,
-                        "matched_keywords": matched_keywords,
-                        "match_score": match_score,
-                        "snippet": r.get("snippet"),
-                        "folder_name": r["folder_name"],
-                        "abstract": r["abstract"],
-                    }
-                )
-
-            # Sort by match score (highest first)
-            processed_results.sort(key=lambda x: x["match_score"], reverse=True)
-            return processed_results
+            rows = await cur.fetchall()
+            return [dict(row) for row in rows]
 
     async def search_combined(
         self,
@@ -823,178 +475,86 @@ class Database:
         limit: int = 20,
         include_snippet: bool = True,
     ) -> List[Dict[str, Any]]:
-        """
-        Combined search using both text query and keywords.
-
-        Args:
-            text_query: Text to search in title/abstract
-            keywords: Keywords to search for
-            keyword_mode: "any" or "all" for keyword logic
-            exact_keyword_match: Exact keyword matching
-            folder_name: Optional folder filter
-            filters: Additional metadata filters
-            limit: Maximum results
-            include_snippet: Include snippets
-
-        Returns:
-            Combined search results with relevance scoring
-        """
         where_conditions = []
         params = []
 
-        # Text search conditions
-        text_conditions = []
+        # Text search condition
         if text_query:
-            text_query_lower = text_query.lower()
-            text_conditions.append("(LOWER(title) LIKE %s OR LOWER(abstract) LIKE %s)")
-            params.extend([f"%{text_query_lower}%", f"%{text_query_lower}%"])
+            where_conditions.append(
+                "(LOWER(title) LIKE %s OR LOWER(abstract) LIKE %s OR EXISTS (SELECT 1 FROM unnest(authors) a WHERE LOWER(a) LIKE %s))"
+            )
+            search_term = f"%{text_query.lower()}%"
+            params.extend([search_term, search_term, search_term])
 
         # Keyword search conditions
-        keyword_conditions = []
         if keywords:
-            if exact_keyword_match:
-                if keyword_mode == "all":
-                    for keyword in keywords:
-                        keyword_conditions.append(
-                            "LOWER(%s) = ANY(ARRAY(SELECT LOWER(unnest(keywords))))"
-                        )
-                        params.append(keyword.lower())
+            keyword_conditions = []
+            for keyword in keywords:
+                if exact_keyword_match:
+                    keyword_conditions.append("EXISTS (SELECT 1 FROM unnest(keywords) k WHERE LOWER(k) = LOWER(%s))")
                 else:
-                    keyword_conditions.append(
-                        "ARRAY(SELECT LOWER(unnest(keywords))) && %s"
-                    )
-                    params.append([kw.lower() for kw in keywords])
-            else:
-                # Fuzzy keyword matching
-                if keyword_mode == "all":
-                    for keyword in keywords:
-                        keyword_conditions.append(
-                            "EXISTS(SELECT 1 FROM unnest(keywords) AS kw WHERE LOWER(kw) LIKE %s)"
-                        )
-                        params.append(f"%{keyword.lower()}%")
-                else:
-                    kw_conditions = []
-                    for keyword in keywords:
-                        kw_conditions.append(
-                            "EXISTS(SELECT 1 FROM unnest(keywords) AS kw WHERE LOWER(kw) LIKE %s)"
-                        )
-                        params.append(f"%{keyword.lower()}%")
-                    keyword_conditions.append(f"({' OR '.join(kw_conditions)})")
+                    keyword_conditions.append("EXISTS (SELECT 1 FROM unnest(keywords) k WHERE LOWER(k) LIKE LOWER(%s))")
+                params.append(f"%{keyword}%" if not exact_keyword_match else keyword)
 
-        # Combine text and keyword conditions
-        search_conditions = []
-        if text_conditions:
-            search_conditions.extend(text_conditions)
-        if keyword_conditions:
-            search_conditions.extend(keyword_conditions)
+            if keyword_mode == "all":
+                where_conditions.append(f"({' AND '.join(keyword_conditions)})")
+            else:  # "any"
+                where_conditions.append(f"({' OR '.join(keyword_conditions)})")
 
-        if search_conditions:
-            where_conditions.append(f"({' OR '.join(search_conditions)})")
+        # Additional filters
+        if filters:
+            for key, value in filters.items():
+                if key == "publication_year":
+                    where_conditions.append("publication_year = %s")
+                    params.append(value)
+                elif key == "journal_name":
+                    where_conditions.append("journal_name = %s")
+                    params.append(value)
+                elif key == "status":
+                    where_conditions.append("status = %s")
+                    params.append(value)
 
-        # Add other filters
         if folder_name:
             where_conditions.append("folder_name = %s")
             params.append(folder_name)
 
-        if filters:
-            for key, value in filters.items():
-                if key == "year_of_publication":
-                    where_conditions.append("publication_year = %s")
-                    params.append(value)
-                elif key in ["journal_name", "status"]:
-                    where_conditions.append(f"{key} = %s")
-                    params.append(value)
-
-        # Build final query
-        where_clause = (
-            f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
-        )
-
-        select_fields = [
-            "id",
-            "title",
-            "authors",
-            "keywords",
-            "folder_name",
-            "abstract",
-            "1.0 as relevance_score",  # Basic relevance score
-        ]
-
-        if include_snippet:
-            select_fields.append("SUBSTRING(abstract, 1, 200) as snippet")
+        where_clause = f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
 
         query = f"""
-        SELECT {", ".join(select_fields)}
-        FROM papers 
-        {where_clause}
-        ORDER BY created_at DESC
-        LIMIT %s
+            SELECT 
+                id, title, authors, journal_name, publication_year,
+                abstract, keywords, folder_name
+            FROM documents
+            {where_clause}
+            ORDER BY created_at DESC
+            LIMIT %s
         """
-
         params.append(limit)
 
         async with self.pool.cursor() as cur:
             await cur.execute(query, params)
-            results = await cur.fetchall()
+            rows = await cur.fetchall()
+            return [dict(row) for row in rows]
 
-            return [
-                {
-                    "id": r["id"],
-                    "title": r["title"],
-                    "authors": r["authors"],
-                    "keywords": r.get("keywords", []),
-                    "relevance_score": float(r["relevance_score"]),
-                    "snippet": r.get("snippet"),
-                    "folder_name": r["folder_name"],
-                    "abstract": r["abstract"],
-                }
-                for r in results
-            ]
-
-    async def get_all_keywords(
-        self, folder_name: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Get all unique keywords from documents with their usage counts.
-
-        Args:
-            folder_name: Optional folder to limit scope
-
-        Returns:
-            List of keywords with usage statistics
-        """
-        where_conditions = ["keywords IS NOT NULL", "array_length(keywords, 1) > 0"]
-        params = []
-
-        if folder_name:
-            where_conditions.append("folder_name = %s")
-            params.append(folder_name)
-
-        where_clause = (
-            f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
-        )
-
+    async def get_all_keywords(self, folder_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        where_clause = "WHERE folder_name = %s" if folder_name else ""
         query = f"""
-        SELECT 
-            LOWER(keyword) as keyword,
-            COUNT(*) as usage_count,
-            COUNT(DISTINCT folder_name) as folder_count
-        FROM papers 
-        CROSS JOIN unnest(keywords) AS keyword
-        {where_clause}
-        GROUP BY LOWER(keyword)
-        ORDER BY usage_count DESC, keyword ASC
+            SELECT DISTINCT unnest(keywords) as keyword, COUNT(*) as count
+            FROM documents
+            {where_clause}
+            GROUP BY keyword
+            ORDER BY count DESC
         """
+        params = [folder_name] if folder_name else []
 
         async with self.pool.cursor() as cur:
             await cur.execute(query, params)
-            results = await cur.fetchall()
+            rows = await cur.fetchall()
+            return [dict(row) for row in rows]
 
-            return [
-                {
-                    "keyword": r["keyword"],
-                    "usage_count": r["usage_count"],
-                    "folder_count": r["folder_count"],
-                }
-                for r in results
-            ]
+    async def update_paper_status(self, document_id: UUID, status: str) -> bool:
+        """Update the status of a document/paper"""
+        query = "UPDATE documents SET status = %s, updated_at = NOW() WHERE id = %s"
+        async with self.pool.cursor() as cur:
+            await cur.execute(query, (status, str(document_id)))
+            return cur.rowcount > 0

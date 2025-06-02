@@ -7,7 +7,7 @@ class DocumentBase(BaseModel):
     title: str
     authors: List[str]
     journal_name: Optional[str] = None
-    year_of_publication: Optional[int] = None
+    publication_year: Optional[int] = None
     abstract: Optional[str] = None
     keywords: Optional[List[str]] = None
     volume: Optional[str] = None
@@ -36,7 +36,7 @@ class DocumentMetadata(BaseModel):
     title: str
     authors: List[str]
     journal_name: Optional[str] = None
-    year_of_publication: Optional[int] = None
+    publication_year: Optional[int] = None
     abstract: Optional[str] = None
     keywords: Optional[List[str]] = None
     volume: Optional[str] = None
@@ -63,7 +63,7 @@ class DocumentListItem(BaseModel):
     title: str
     authors: List[str]
     journal_name: Optional[str]
-    year_of_publication: Optional[int]
+    publication_year: Optional[int]
     abstract: Optional[str]
     folder_name: Optional[str]
 
@@ -106,8 +106,6 @@ class DocumentFilters(BaseModel):
 class FolderInfo(BaseModel):
     name: str
     path: str
-    document_count: int
-    subfolders: List[str] = []
 
 
 class FoldersResponse(BaseModel):
@@ -137,7 +135,7 @@ class UpdateMetadataRequest(BaseModel):
     title: Optional[str] = None
     authors: Optional[List[str]] = None
     journal_name: Optional[str] = None
-    year_of_publication: Optional[int] = None
+    publication_year: Optional[int] = None
     abstract: Optional[str] = None
     keywords: Optional[List[str]] = None
     volume: Optional[str] = None
@@ -199,24 +197,12 @@ class SimilarDocumentsResponse(BaseModel):
 
 
 class KeywordSearchQuery(BaseModel):
-    keywords: List[str] = Field(
-        ..., min_items=1, description="List of keywords to search for"
-    )
-    search_mode: str = Field(
-        default="any", description="Search mode: 'any' (OR logic) or 'all' (AND logic)"
-    )
-    exact_match: bool = Field(
-        default=False, description="Whether to use exact keyword matching"
-    )
-    case_sensitive: bool = Field(
-        default=False, description="Whether search is case sensitive"
-    )
-    folder_name: Optional[str] = Field(
-        default=None, description="Optional folder to scope search"
-    )
-    limit: int = Field(
-        default=50, ge=1, le=100, description="Maximum number of results"
-    )
+    keywords: List[str] = Field(..., min_length=1, description="List of keywords to search for")
+    search_mode: str = Field(default="any", description="Search mode: 'any' (OR logic) or 'all' (AND logic)")
+    exact_match: bool = Field(default=False, description="Whether to use exact keyword matching")
+    case_sensitive: bool = Field(default=False, description="Whether search is case sensitive")
+    folder_name: Optional[str] = Field(default=None, description="Optional folder to scope search")
+    limit: int = Field(default=50, ge=1, le=100, description="Maximum number of results")
     include_snippet: bool = Field(default=True, description="Include abstract snippets")
 
 
@@ -242,23 +228,11 @@ class KeywordSearchResponse(BaseModel):
 
 
 class CombinedSearchQuery(BaseModel):
-    text_query: Optional[str] = Field(
-        default=None, description="Text query for title/abstract search"
-    )
-    keywords: Optional[List[str]] = Field(
-        default=None, description="Keywords to search for"
-    )
-    keyword_mode: str = Field(
-        default="any", description="Keyword search mode: 'any' or 'all'"
-    )
-    exact_keyword_match: bool = Field(
-        default=False, description="Exact keyword matching"
-    )
-    folder_name: Optional[str] = Field(
-        default=None, description="Optional folder filter"
-    )
-    filters: Optional[Dict[str, Any]] = Field(
-        default=None, description="Additional metadata filters"
-    )
+    text_query: Optional[str] = Field(default=None, description="Text query for title/abstract search")
+    keywords: Optional[List[str]] = Field(default=None, description="Keywords to search for")
+    keyword_mode: str = Field(default="any", description="Keyword search mode: 'any' or 'all'")
+    exact_keyword_match: bool = Field(default=False, description="Exact keyword matching")
+    folder_name: Optional[str] = Field(default=None, description="Optional folder filter")
+    filters: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata filters")
     limit: int = Field(default=20, ge=1, le=100, description="Maximum results")
     include_snippet: bool = Field(default=True, description="Include snippets")

@@ -38,33 +38,21 @@ load_dotenv()
 
 DB_URL = os.getenv("DATABASE_URL")
 if not DB_URL:
-    raise ValueError(
-        "DATABASE_URL environment variable is not set. Please create a .env file or set it directly."
-    )
+    raise ValueError("DATABASE_URL environment variable is not set. Please create a .env file or set it directly.")
 MONITOR_DIRECTORY = os.getenv("DIRECTORY", ".")
 
+# Initialize database and Ollama client
+db = Database(DB_URL)
+ollama_client = OllamaAsyncClient()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    await db.connect()
-    app.include_router(get_router(db, ollama_client, None))
-    logger.info("Application startup complete.")
-    try:
-        yield
-    finally:
-        # Shutdown
-        await db.close()
-        # await ollama_client.close()
-        logger.info("Application shutdown complete.")
-
-
+# Create FastAPI app
 app = FastAPI(
     title="Research Paper Knowledge Extraction API",
     description="Extracts, summarizes, and searches research papers using LLMs and PostgreSQL.",
     version="1.0.0",
-    lifespan=lifespan,
 )
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -72,8 +60,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-db = Database(DB_URL)
-ollama_client = OllamaAsyncClient()
+# Include the router with prefix
+app.include_router(get_router(db, ollama_client, None), prefix="/api")
+
+
+# Add a test endpoint
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the Research Paper Knowledge Extraction API"}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    if not hasattr(app.state, "db"):
+        await db.connect()
+        app.state.db = db
+    logger.info("Application startup complete.")
+    try:
+        yield
+    finally:
+        # Shutdown
+        if hasattr(app.state, "db"):
+            await app.state.db.close()
+        logger.info("Application shutdown complete.")
+
+
+# Set the lifespan
+app.lifespan = lifespan
 
 
 # @app.on_event("startup")

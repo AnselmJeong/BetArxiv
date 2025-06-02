@@ -6,12 +6,16 @@ from pathlib import Path
 import argparse
 import traceback
 from tqdm import tqdm
+import dotenv
+
 
 # Import your app's database and processing logic
 from app.db import Database
 from app.paper_processor import process_pdf
 from ollama import AsyncClient as OllamaAsyncClient
 
+
+dotenv.load_dotenv()
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -26,7 +30,7 @@ async def get_all_pdf_paths(base_dir):
 
 async def get_already_ingested_paths(db):
     # Query all URLs (file paths) from the DB
-    query = "SELECT url FROM papers WHERE url IS NOT NULL"
+    query = "SELECT url FROM documents WHERE url IS NOT NULL"
     async with db.pool.cursor() as cur:
         await cur.execute(query)
         rows = await cur.fetchall()
@@ -39,9 +43,7 @@ async def main(data_root):
     await db.connect()
     ollama_client = OllamaAsyncClient()
     all_pdfs = set(await get_all_pdf_paths(data_root))
-    print(
-        f"[DEBUG] Found {len(all_pdfs)} PDFs in '{data_root}' (including subdirectories)"
-    )
+    print(f"[DEBUG] Found {len(all_pdfs)} PDFs in '{data_root}' (including subdirectories)")
     already_ingested = set(await get_already_ingested_paths(db))
     print(f"[DEBUG] Found {len(already_ingested)} already-ingested PDFs in DB")
     new_pdfs = all_pdfs - already_ingested
@@ -66,9 +68,7 @@ async def main(data_root):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Ingest new PDFs from a data root directory."
-    )
+    parser = argparse.ArgumentParser(description="Ingest new PDFs from a data root directory.")
     parser.add_argument(
         "--directory",
         "-d",

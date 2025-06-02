@@ -3,8 +3,8 @@
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Main documents table (renamed from papers for clarity, but keeping 'papers' for compatibility)
-CREATE TABLE IF NOT EXISTS papers (
+-- Main documents table
+CREATE TABLE IF NOT EXISTS documents (
     -- Primary identifier
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     
@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS papers (
     title TEXT NOT NULL,
     authors TEXT[] NOT NULL,
     journal_name TEXT,
-    volume_issue TEXT,  -- Combined volume and issue for legacy compatibility
+    volume TEXT,
+    issue TEXT, 
     publication_year INTEGER,
     abstract TEXT,
     keywords TEXT[],
@@ -43,21 +44,20 @@ CREATE TABLE IF NOT EXISTS papers (
 );
 
 -- Indexes for efficient querying
-CREATE INDEX IF NOT EXISTS idx_papers_title ON papers (title);
-CREATE INDEX IF NOT EXISTS idx_papers_authors ON papers USING GIN (authors);
-CREATE INDEX IF NOT EXISTS idx_papers_keywords ON papers USING GIN (keywords);
-CREATE INDEX IF NOT EXISTS idx_papers_folder_name ON papers (folder_name);
-CREATE INDEX IF NOT EXISTS idx_papers_status ON papers (status);
-CREATE INDEX IF NOT EXISTS idx_papers_publication_year ON papers (publication_year);
+CREATE INDEX IF NOT EXISTS idx_documents_title ON documents (title);
+CREATE INDEX IF NOT EXISTS idx_documents_authors ON documents USING GIN (authors);
+CREATE INDEX IF NOT EXISTS idx_documents_keywords ON documents USING GIN (keywords);
+CREATE INDEX IF NOT EXISTS idx_documents_folder_name ON documents (folder_name);
+CREATE INDEX IF NOT EXISTS idx_documents_status ON documents (status);
+CREATE INDEX IF NOT EXISTS idx_documents_publication_year ON documents (publication_year);
 
 -- Vector similarity search indexes (requires pgvector extension)
-CREATE INDEX IF NOT EXISTS idx_papers_title_embedding ON papers USING hnsw (title_embedding vector_cosine_ops);
-CREATE INDEX IF NOT EXISTS idx_papers_abstract_embedding ON papers USING hnsw (abstract_embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_documents_title_embedding ON documents USING hnsw (title_embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_documents_abstract_embedding ON documents USING hnsw (abstract_embedding vector_cosine_ops);
 
 -- Add comments for documentation
-COMMENT ON TABLE papers IS 'Main table storing research documents and their processed content';
-COMMENT ON COLUMN papers.folder_name IS 'Folder path relative to base directory where the document is stored';
-COMMENT ON COLUMN papers.url IS 'Full file path to the original document';
-COMMENT ON COLUMN papers.volume_issue IS 'Combined volume and issue information (legacy field)';
-COMMENT ON COLUMN papers.title_embedding IS 'Vector embedding of document title for semantic search';
-COMMENT ON COLUMN papers.abstract_embedding IS 'Vector embedding of document abstract for semantic search'; 
+COMMENT ON TABLE documents IS 'Main table storing research documents and their processed content';
+COMMENT ON COLUMN documents.folder_name IS 'Folder path relative to base directory where the document is stored';
+COMMENT ON COLUMN documents.url IS 'Full file path to the original document';
+COMMENT ON COLUMN documents.title_embedding IS 'Vector embedding of document title for semantic search';
+COMMENT ON COLUMN documents.abstract_embedding IS 'Vector embedding of document abstract for semantic search'; 
