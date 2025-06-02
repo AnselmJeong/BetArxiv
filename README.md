@@ -1,276 +1,199 @@
-# Betarxiv
+# BetArxiv
 
-## Research Paper Knowledge Extraction API
+## Research Paper Knowledge Management API
 
-A FastAPI-based service for extracting, summarizing, and searching research papers using LLMs, with PostgreSQL storage and directory monitoring.
+A FastAPI-based service for searching, browsing, and managing research papers stored in PostgreSQL with vector embeddings.
+
+## Architecture Overview
+
+**BetArxiv** is now structured with two main components:
+
+1. **Read-Only FastAPI Service** (`app/`) - Provides search, browse, and document management endpoints
+2. **Batch Processing Script** (`batch_processor.py`) - Handles PDF ingestion and processing using LLMs
+
+This separation allows for:
+- A clean, focused API for frontend applications
+- Independent PDF processing that can be run manually or scheduled
+- Better separation of concerns between data access and data processing
 
 ## Features
 
--   Upload and process research papers (PDFs)
--   Extract metadata and generate summaries using LLMs (Ollama)
--   Store all data and embeddings in PostgreSQL (with pgvector)
--   Monitor a directory for new papers and process them automatically
--   Search, browse, and find similar papers via API
+- **Search and Browse**: Full-text search, keyword search, similarity search
+- **Document Management**: View, update metadata and summaries
+- **Folder Organization**: Browse papers by folder structure
+- **Vector Embeddings**: Find similar papers using semantic similarity
+- **PostgreSQL Storage**: Robust storage with pgvector for embeddings
+
+## Quick Start
+
+### 1. Setup Database
+```bash
+# Install PostgreSQL with pgvector extension
+# Create database and run schema
+psql -d your_db < app/schema.sql
+```
+
+### 2. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure Environment
+```bash
+# Create .env file
+DATABASE_URL=postgresql://user:password@localhost/betarxiv
+DIRECTORY=./docs  # Directory containing PDFs for batch processing
+```
+
+### 4. Run API Server
+```bash
+# Start the FastAPI server
+uvicorn app.main:app --reload --port 8000
+```
+
+### 5. Process PDFs (Optional)
+```bash
+# Run batch processing to ingest PDFs
+python batch_processor.py --directory ./your_pdf_directory
+```
 
 ## API Documentation
 
 ### Document Management
 
 #### List Documents
-
-``` http
-GET /documents
+```http
+GET /api/documents
 ```
 
-Query Parameters: - `skip` (int, optional): Number of documents to skip (default: 0) - `limit` (int, optional): Maximum number of documents to return (default: 50, max: 100) - `folder_name` (string, optional): Filter by folder name - `filters` (object, optional): Additional filters (e.g., year, journal)
-
-Response:
-
-``` json
-{
-    "documents": [
-        {
-            "id": "uuid",
-            "title": "string",
-            "authors": ["string"],
-            "journal_name": "string",
-            "year_of_publication": "integer",
-            "abstract": "string",
-            "folder_name": "string"
-        }
-    ],
-    "total": "integer",
-    "skip": "integer",
-    "limit": "integer"
-}
-```
+Query Parameters:
+- `skip` (int, optional): Number of documents to skip (default: 0)
+- `limit` (int, optional): Maximum number of documents to return (default: 50, max: 100)
+- `folder_name` (string, optional): Filter by folder name
+- `filters` (object, optional): Additional filters
 
 #### Get Document
-
-``` http
-GET /documents/{document_id}
+```http
+GET /api/documents/{document_id}
 ```
-
-Response: Full document details including metadata, summary, and embeddings.
 
 #### Get Document Summary
-
-``` http
-GET /documents/{document_id}/summary
-```
-
-Response:
-
-``` json
-{
-    "summary": "string",
-    "distinction": "string",
-    "methodology": "string",
-    "results": "string",
-    "implications": "string"
-}
+```http
+GET /api/documents/{document_id}/summary
 ```
 
 #### Get Document Metadata
-
-``` http
-GET /documents/{document_id}/metadata
+```http
+GET /api/documents/{document_id}/metadata
 ```
-
-Response: Document metadata including title, authors, journal, etc.
 
 #### Update Document Summary
-
-``` http
-PUT /documents/{document_id}/update_summary
-```
-
-Request Body:
-
-``` json
-{
-    "summary": "string",
-    "distinction": "string",
-    "methodology": "string",
-    "results": "string",
-    "implications": "string"
-}
+```http
+PATCH /api/documents/{document_id}/summary
 ```
 
 #### Update Document Metadata
-
-``` http
-PUT /documents/{document_id}/update_metadata
-```
-
-Request Body:
-
-``` json
-{
-    "title": "string",
-    "authors": ["string"],
-    "journal_name": "string",
-    "year_of_publication": "integer",
-    "abstract": "string",
-    "keywords": ["string"],
-    "volume": "string",
-    "issue": "string"
-}
+```http
+PATCH /api/documents/{document_id}/metadata
 ```
 
 ### Search Functionality
 
 #### Semantic Search
-
-``` http
-POST /retrieve/docs
+```http
+GET /api/documents/search?query=machine+learning
 ```
 
-Request Body:
-
-``` json
-{
-    "query": "string",
-    "folder_name": "string",
-    "k": "integer",
-    "filters": {
-        "year_of_publication": "integer",
-        "journal_name": "string",
-        "status": "string"
-    }
-}
+#### Similar Documents
+```http
+GET /api/documents/{document_id}/similar
 ```
-
-#### Similar Documents Search
-
-``` http
-GET /documents/{document_id}/similar
-```
-
-Query Parameters: - `limit` (int, optional): Maximum results (default: 10, max: 50) - `threshold` (float, optional): Similarity threshold (default: 0.7) - `title_weight` (float, optional): Weight for title similarity (default: 0.75) - `abstract_weight` (float, optional): Weight for abstract similarity (default: 0.25) - `include_snippet` (boolean, optional): Include abstract snippets (default: true) - `folder_name` (string, optional): Filter by folder
 
 #### Keyword Search
-
-``` http
-POST /search/keywords
-```
-
-Request Body:
-
-``` json
-{
-    "keywords": ["string"],
-    "search_mode": "string",  // "any" or "all"
-    "exact_match": "boolean",
-    "case_sensitive": "boolean",
-    "limit": "integer",
-    "folder_name": "string"
-}
+```http
+GET /api/documents/search/keywords?keywords=ai&keywords=ml&search_mode=any
 ```
 
 #### Combined Search
-
-``` http
-POST /search/combined
-```
-
-Request Body:
-
-``` json
-{
-    "text_query": "string",
-    "keywords": ["string"],
-    "keyword_mode": "string",  // "any" or "all"
-    "exact_keyword_match": "boolean",
-    "folder_name": "string",
-    "filters": {
-        "year_of_publication": "integer",
-        "journal_name": "string"
-    },
-    "limit": "integer",
-    "include_snippet": "boolean"
-}
+```http
+GET /api/documents/search/combined?text_query=neural+networks&keywords=deep+learning
 ```
 
 ### Folder Management
 
 #### List Folders
-
-``` http
-GET /folders
+```http
+GET /api/documents/folders
 ```
 
-Response:
-
-``` json
-{
-    "folders": [
-        {
-            "name": "string",
-            "path": "string",
-            "document_count": "integer",
-            "subfolders": ["string"]
-        }
-    ]
-}
+#### Get Status
+```http
+GET /api/documents/status
 ```
 
-### System Status
+## Batch Processing
 
-#### Get Processing Status
+The `batch_processor.py` script handles PDF ingestion and processing:
 
-``` http
-GET /papers/status
+```bash
+# Process PDFs in a directory
+python batch_processor.py --directory ./research_papers
+
+# Process PDFs in default directory (./docs)
+python batch_processor.py
 ```
 
-Query Parameters: - `paper_id` (UUID, optional): Check status for specific paper
+The script will:
+1. Scan for PDF files recursively
+2. Check which files are already processed
+3. Convert PDFs to markdown using Docling
+4. Extract metadata using LLM (Ollama)
+5. Generate summaries and analysis
+6. Create vector embeddings
+7. Store everything in PostgreSQL
 
-Response:
+## Testing
 
-``` json
-{
-    "total_documents": "integer",
-    "processed": "integer",
-    "pending": "integer",
-    "errors": "integer"
-}
+Run the test suite:
+
+```bash
+# Run all tests
+pytest test_api.py -v
+
+# Run specific test categories
+pytest test_api.py::TestDatabaseSetup -v
+pytest test_api.py::TestDatabaseOperations -v
 ```
-
-## Error Handling
-
-The API uses standard HTTP status codes: - 200: Success - 400: Bad Request - 404: Not Found - 500: Internal Server Error
-
-Error responses include a detail message:
-
-``` json
-{
-    "detail": "Error message"
-}
-```
-
-## Rate Limiting
-
-The API implements rate limiting to prevent abuse. Current limits: - 100 requests per minute per IP - 1000 requests per hour per IP
-
-## Authentication
-
-Currently, the API does not implement authentication. It is recommended to: 1. Run the API behind a reverse proxy 2. Implement API key authentication 3. Use HTTPS in production
 
 ## Development
 
-### Running Tests
-
-``` bash
-# Create test database
-createdb betarxiv_test
-
-# Install test dependencies
-pip install -r requirements-test.txt
-
-# Run tests
-pytest tests/ -v
+### Project Structure
+```
+betarxiv/
+├── app/                    # FastAPI application
+│   ├── main.py            # FastAPI app and startup
+│   ├── api.py             # API route handlers
+│   ├── db.py              # Database operations
+│   ├── models.py          # Pydantic models
+│   └── schema.sql         # Database schema
+├── batch_processor.py     # PDF processing script
+├── test_api.py           # Test suite
+├── verify_setup.py       # Setup verification
+└── requirements.txt      # Dependencies
 ```
 
-### API Testing
+### Key Dependencies
+- **FastAPI**: Web framework for the API
+- **PostgreSQL + pgvector**: Database with vector similarity
+- **Ollama**: Local LLM for text processing
+- **Docling**: PDF to markdown conversion
+- **Pydantic**: Data validation and serialization
 
-You can use the interactive API documentation at: - Swagger UI: `http://localhost:8000/docs` - ReDoc: `http://localhost:8000/redoc`
+## Environment Variables
+
+- `DATABASE_URL`: PostgreSQL connection string
+- `DIRECTORY`: Directory to scan for PDFs (batch processing only)
+
+## License
+
+MIT License

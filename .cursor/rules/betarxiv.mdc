@@ -1,0 +1,99 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Cursor Rules for Next.js (Shadcn UI) + FastAPI Web App
+
+## Project Structure
+- Frontend: Next.js with Shadcn UI components in `app/` and `components/`
+- Backend: FastAPI in `backend/` with Python files
+- API routes: FastAPI endpoints in `backend/main.py` or `backend/routers/`
+- Static files: Served from `public/` in Next.js
+- Database: Use SQLAlchemy (or other ORM) in `backend/models/` and `backend/database/`
+
+## Coding Conventions
+### Next.js Frontend
+- Use TypeScript for all Next.js components and pages (`*.tsx` files)
+- Follow Shadcn UI component structure: Place reusable components in `components/ui/`
+- Use Tailwind CSS for styling, integrated via Shadcn UI
+- Prefer functional components with React hooks
+- File naming: Use kebab-case for files (e.g., `my-component.tsx`)
+- API calls: Use `fetch` or `axios` in `app/api/` for server-side data fetching
+- Next.js routing: Use App Router (`app/`) for all new routes
+- Component exports: Use named exports for components, default exports for pages
+
+### FastAPI Backend
+- Use Python 3.10+ for FastAPI
+- File naming: Use snake_case for Python files (e.g., `my_endpoint.py`)
+- Follow FastAPI best practices: Use Pydantic models in `backend/models/`
+- Async/await: Use `async def` for API endpoints where applicable
+- Organize endpoints in `backend/routers/` for modularity
+- Use dependency injection for database sessions and authentication
+- Error handling: Implement custom exception handlers in `backend/exceptions/`
+
+## Code Style
+- Use Prettier for frontend code formatting (Next.js/TypeScript)
+- Use Black for backend Python code formatting
+- Indentation: 2 spaces for TypeScript/JavaScript, 4 spaces for Python
+- Quotes: Single quotes (`'`) for TypeScript/JavaScript, double quotes (`"`) for Python
+- Imports: Group and sort imports (standard libraries, third-party, local)
+- Comments: Use JSDoc for TypeScript functions, docstrings for Python functions
+
+
+## Specific Instructions
+- Shadcn UI: When adding new components, initialize them with `npx shadcn-ui@latest add <component>`
+- Next.js: Prefer server components unless client-side interactivity is needed
+- FastAPI: Use `APIRouter` for modular route definitions
+- Environment variables: Store in `.env` and access via `process.env` (Next.js) or `pydantic_settings` (FastAPI)
+- the code is in directory `frontend`, to start the server `cd frontend && pnpm dev`
+- Database: Prefer async SQLAlchemy with SQLite/PostgreSQL for development
+- Authentication: Implement JWT-based auth in FastAPI, integrate with Next.js via cookies or headers
+
+## Example Patterns
+### Next.js Component
+# File: components/ui/my-component.tsx
+```tsx
+'use client';
+import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+
+/**
+ * A reusable button component with counter
+ */
+export function MyComponent() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <Button onClick={() => setCount(count + 1)}>
+      Count: {count}
+    </Button>
+  );
+}
+```
+
+### FastAPI Endpoint
+# File: backend/routers/my_router.py
+```python
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from ..dependencies import get_db
+
+router = APIRouter()
+
+class Item(BaseModel):
+    name: str
+    description: str | None = None
+
+@router.get("/items/")
+async def read_items(db = Depends(get_db)):
+    """Retrieve all items from the database"""
+    return {"items": []}
+```
+
+## Additional Notes
+- When generating code, prioritize type safety in TypeScript and Pydantic
+- Ensure CORS is configured in FastAPI for Next.js frontend
+- Use relative imports within the same directory, absolute imports for cross-directory references
+- Avoid generating code that requires external file I/O unless explicitly requested
+- For UI components, follow Shadcn UI's structure and naming conventions

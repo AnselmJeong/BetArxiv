@@ -28,44 +28,12 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-gray-50 min-h-full">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-8">
-              <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 bg-black rounded"></div>
-                <span className="text-xl font-semibold text-gray-900">Betarxiv</span>
-              </div>
-              <nav className="flex space-x-6">
-                <a href="#" className="text-gray-700 hover:text-gray-900 font-medium">My Library</a>
-                <a href="#" className="text-gray-500 hover:text-gray-700">Explore</a>
-                <a href="#" className="text-gray-500 hover:text-gray-700">Help</a>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  type="search"
-                  placeholder="Search"
-                  className="pl-10 pr-4 py-2 w-64 bg-gray-100 border-0 rounded-lg"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <Avatar className="h-8 w-8">
-                <AvatarImage src="/api/placeholder/32/32" alt="User" />
-                <AvatarFallback>S</AvatarFallback>
-              </Avatar>
-            </div>
-          </div>
-        </div>
-      </header>
+     
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* My Library Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">My Library</h1>
@@ -167,7 +135,7 @@ export default function Home() {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

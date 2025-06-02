@@ -403,7 +403,7 @@ wheels = [
 
 [[package]]
 name = "docling-core"
-version = "2.32.0"
+version = "2.33.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jsonref" },
@@ -417,9 +417,9 @@ dependencies = [
     { name = "typer" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3b/53/6017e92236172a994d8592db285990cd911dbbd328fab022406efc66e605/docling_core-2.32.0.tar.gz", hash = "sha256:3ec21461f309540bd8bf4880f6c2f0144f6895988102a4204ca5549c76a945c8", size = 113939 }
+sdist = { url = "https://files.pythonhosted.org/packages/e1/21/1b6e4b0dd40f36b0da085d642dec2713e35fdd5d00b88d433deac9024d36/docling_core-2.33.0.tar.gz", hash = "sha256:f334ebb917d8a212ef2a3d7e77e6381fdbec202fff0d9b762998def02da61de1", size = 139332 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ee/29/eac2c6af02e21090fab38a1fcb2471baf59b346af4d35312cdb6ec68595a/docling_core-2.32.0-py3-none-any.whl", hash = "sha256:6c643b45a18c5ed8cecf12d1eeeb7ff677dcfdb24fa4aa88122e3c9cc2aeb58d", size = 143730 },
+    { url = "https://files.pythonhosted.org/packages/e7/11/814d99785edac45af1b8be8fcce1df8a956bcfe8456d59928e1c932c37a9/docling_core-2.33.0-py3-none-any.whl", hash = "sha256:174c31379514d7552044aa21129c972a628265e2efea5059b4e0aef3685f8022", size = 144206 },
 ]
 
 [package.optional-dependencies]
@@ -1808,15 +1808,15 @@ wheels = [
 
 [[package]]
 name = "pydantic-extra-types"
-version = "2.10.4"
+version = "2.10.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d9/33/0cde418479949cd6aa1ac669deffcd1c37d8d9cead99ddb48f344e75f2e3/pydantic_extra_types-2.10.4.tar.gz", hash = "sha256:bf8236a63d061eb3ecb1b2afa78ba0f97e3f67aa11dbbff56ec90491e8772edc", size = 95269 }
+sdist = { url = "https://files.pythonhosted.org/packages/7e/ba/4178111ec4116c54e1dc7ecd2a1ff8f54256cdbd250e576882911e8f710a/pydantic_extra_types-2.10.5.tar.gz", hash = "sha256:1dcfa2c0cf741a422f088e0dbb4690e7bfadaaf050da3d6f80d6c3cf58a2bad8", size = 138429 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/df/ac/bee195ee49256385fad460ce420aeb42703a648dba487c20b6fd107e42ea/pydantic_extra_types-2.10.4-py3-none-any.whl", hash = "sha256:ce064595af3cab05e39ae062752432dcd0362ff80f7e695b61a3493a4d842db7", size = 37276 },
+    { url = "https://files.pythonhosted.org/packages/70/1a/5f4fd9e7285f10c44095a4f9fe17d0f358d1702a7c74a9278c794e8a7537/pydantic_extra_types-2.10.5-py3-none-any.whl", hash = "sha256:b60c4e23d573a69a4f1a16dd92888ecc0ef34fb0e655b4f305530377fa70e7a8", size = 38315 },
 ]
 
 [[package]]

@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager
 
 from .db import Database
 from .api import get_router
-from ollama import AsyncClient as OllamaAsyncClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -38,12 +37,13 @@ load_dotenv()
 
 DB_URL = os.getenv("DATABASE_URL")
 if not DB_URL:
-    raise ValueError("DATABASE_URL environment variable is not set. Please create a .env file or set it directly.")
+    raise ValueError(
+        "DATABASE_URL environment variable is not set. Please create a .env file or set it directly."
+    )
 MONITOR_DIRECTORY = os.getenv("DIRECTORY", ".")
 
-# Initialize database and Ollama client
+# Initialize database
 db = Database(DB_URL)
-ollama_client = OllamaAsyncClient()
 
 
 @asynccontextmanager
@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
         logger.info("Database connected successfully.")
 
         # Include the router after database connection
-        app.include_router(get_router(db, ollama_client, None), prefix="/api")
+        app.include_router(get_router(db), prefix="/api")
         logger.info("API routes registered.")
 
         yield
@@ -76,7 +76,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app with lifespan
 app = FastAPI(
     title="Research Paper Knowledge Extraction API",
-    description="Extracts, summarizes, and searches research papers using LLMs and PostgreSQL.",
+    description="Search and manage research papers stored in PostgreSQL.",
     version="1.0.0",
     lifespan=lifespan,
 )

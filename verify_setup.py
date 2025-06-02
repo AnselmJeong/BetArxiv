@@ -23,7 +23,6 @@ async def test_imports():
         # Test app modules
         from app.db import Database
         from app.models import DocumentCreate, Document
-        from app.paper_processor import process_pdf
 
         print("✅ App modules imported successfully")
 
@@ -40,7 +39,9 @@ async def test_database_connection():
     try:
         from app.db import Database
 
-        dsn = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
+        dsn = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres"
+        )
         db = Database(dsn)
         await db.connect()
 
@@ -65,7 +66,9 @@ async def test_schema():
     try:
         from app.db import Database
 
-        dsn = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
+        dsn = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres"
+        )
         db = Database(dsn)
         await db.connect()
 
@@ -115,7 +118,9 @@ async def main():
 
     # Set environment
     if not os.getenv("DATABASE_URL"):
-        os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@localhost:5432/postgres"
+        os.environ["DATABASE_URL"] = (
+            "postgresql://postgres:postgres@localhost:5432/postgres"
+        )
 
     tests = [test_imports, test_database_connection, test_schema, test_model_validation]
 
