@@ -1,66 +1,259 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Document } from '@/types/api';
+import { SearchResult, SearchResponse, KeywordSearchResponse } from '@/types/api';
 
-interface SearchResult {
-  title: string;
-  snippet: string;
-  authors: string[];
-  journal: string;
-  year: number;
+interface TabState {
+  query: string;
+  results: SearchResult[];
+  totalResults: number;
+  isLoading: boolean;
+  error: string | null;
+  currentPage: number;
 }
 
-// Mock search results data
-const mockSearchResults: SearchResult[] = [
-  {
-    title: "The Evolution of Indie Rock in the Digital Age",
-    snippet: "The study explores the evolution of indie rock music in the 21st century, focusing on the impact of digital platforms on music distribution and consumption. It analyzes the stylistic shifts in indie rock, highlighting the influence of various subgenres and technological advancements.",
-    authors: ["Alex Turner", "Jamie Cook", "Matt Helders"],
-    journal: "Journal of Musicology",
-    year: 2023,
-  },
-  {
-    title: "The Pop-Punk Revival: Nostalgia and Innovation",
-    snippet: "This paper examines the resurgence of pop-punk in contemporary music, particularly focusing on the influence of early 2000s pop-punk bands on current artists. It discusses the lyrical themes, musical elements, and cultural context of this revival.",
-    authors: ["Olivia Rodriguez", "Daniel Nigro"],
-    journal: "Pop Music Review",
-    year: 2022,
-  },
-  {
-    title: "Modern Songwriting Techniques: A Comprehensive Analysis",
-    snippet: "A comprehensive analysis of modern songwriting techniques, covering melody construction, lyrical depth, and production styles. The study includes case studies of successful songs from various genres, providing insights into their compositional elements.",
-    authors: ["Taylor Swift", "Jack Antonoff"],
-    journal: "Songwriting Quarterly",
-    year: 2021,
-  },
-];
+const initialTabState: TabState = {
+  query: '',
+  results: [],
+  totalResults: 0,
+  isLoading: false,
+  error: null,
+  currentPage: 1,
+};
+
+// localStorage에서 상태를 안전하게 읽어오는 헬퍼 함수
+const loadFromLocalStorage = (key: string, defaultValue: TabState): TabState => {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const item = localStorage.getItem(key);
+    if (!item) return defaultValue;
+    
+    const parsed = JSON.parse(item);
+    
+    // 파싱된 객체가 TabState 형태인지 검증
+    if (typeof parsed === 'object' && parsed !== null && 
+        typeof parsed.query === 'string' &&
+        Array.isArray(parsed.results) &&
+        typeof parsed.totalResults === 'number' &&
+        typeof parsed.isLoading === 'boolean' &&
+        typeof parsed.currentPage === 'number') {
+      return parsed;
+    } else {
+      console.warn(`Invalid TabState format in localStorage for key: ${key}`);
+      return defaultValue;
+    }
+  } catch (e) {
+    console.error(`Failed to parse ${key} from localStorage:`, e);
+    // 잘못된 데이터를 제거
+    localStorage.removeItem(key);
+    return defaultValue;
+  }
+};
+
+// 단순 문자열 값을 localStorage에서 읽어오는 헬퍼 함수
+const loadStringFromLocalStorage = (key: string, defaultValue: string): string => {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const item = localStorage.getItem(key);
+    if (!item) return defaultValue;
+    
+    // JSON으로 파싱 시도해보고, 실패하면 문자열로 반환
+    try {
+      const parsed = JSON.parse(item);
+      if (typeof parsed === 'string') {
+        return parsed;
+      }
+      return defaultValue;
+    } catch {
+      // JSON이 아닌 단순 문자열인 경우
+      return item;
+    }
+  } catch (e) {
+    console.error(`Failed to load string ${key} from localStorage:`, e);
+    localStorage.removeItem(key);
+    return defaultValue;
+  }
+};
 
 export default function SearchPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('semantic');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const router = useRouter();
+  
+  // localStorage 정리 (한 번만 실행)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // 잘못된 형식의 localStorage 데이터 정리
+      const cleanupLocalStorage = () => {
+        const keys = ['search-semantic-state', 'search-keyword-state', 'search-active-tab'];
+        keys.forEach(key => {
+          try {
+            const item = localStorage.getItem(key);
+            if (item && key !== 'search-active-tab') {
+              // TabState 형태가 아닌 경우 제거
+              const parsed = JSON.parse(item);
+              if (typeof parsed !== 'object' || !parsed.hasOwnProperty('query')) {
+                localStorage.removeItem(key);
+                console.log(`Cleaned up invalid localStorage key: ${key}`);
+              }
+            } else if (item && key === 'search-active-tab') {
+              // activeTab이 JSON 형태로 저장된 경우 제거
+              if (item.startsWith('{') || item.startsWith('[')) {
+                localStorage.removeItem(key);
+                console.log(`Cleaned up invalid activeTab format: ${key}`);
+              }
+            }
+          } catch (e) {
+            localStorage.removeItem(key);
+            console.log(`Cleaned up corrupted localStorage key: ${key}`);
+          }
+        });
+      };
+      
+      cleanupLocalStorage();
+    }
+  }, []);
+  
+  // localStorage에서 직접 초기값 읽어오기
+  const [activeTab, setActiveTab] = useState(() => 
+    loadStringFromLocalStorage('search-active-tab', 'semantic')
+  );
+  
+  const [semanticState, setSemanticState] = useState<TabState>(() => 
+    loadFromLocalStorage('search-semantic-state', initialTabState)
+  );
+  
+  const [keywordState, setKeywordState] = useState<TabState>(() => 
+    loadFromLocalStorage('search-keyword-state', initialTabState)
+  );
+
+  // 상태 변경시 localStorage에 저장
+  useEffect(() => {
+    localStorage.setItem('search-semantic-state', JSON.stringify(semanticState));
+  }, [semanticState]);
+
+  useEffect(() => {
+    localStorage.setItem('search-keyword-state', JSON.stringify(keywordState));
+  }, [keywordState]);
+
+  useEffect(() => {
+    localStorage.setItem('search-active-tab', activeTab);
+  }, [activeTab]);
+
+  const getCurrentState = () => {
+    return activeTab === 'semantic' ? semanticState : keywordState;
+  };
+
+  const updateCurrentState = (updates: Partial<TabState>) => {
+    if (activeTab === 'semantic') {
+      setSemanticState(prev => ({ ...prev, ...updates }));
+    } else {
+      setKeywordState(prev => ({ ...prev, ...updates }));
+    }
+  };
+
+  const handleSemanticSearch = async () => {
+    if (!semanticState.query.trim()) {
+      setSemanticState(prev => ({ ...prev, error: 'Please enter a search query' }));
+      return;
+    }
+
+    setSemanticState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const response = await fetch(
+        `/api/documents/search?query=${encodeURIComponent(semanticState.query)}&k=20`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: SearchResponse = await response.json();
+      setSemanticState(prev => ({
+        ...prev,
+        results: data.results,
+        totalResults: data.total_results,
+        isLoading: false,
+      }));
+    } catch (err) {
+      console.error('Semantic search error:', err);
+      setSemanticState(prev => ({
+        ...prev,
+        error: 'Failed to perform semantic search. Please try again.',
+        results: [],
+        isLoading: false,
+      }));
+    }
+  };
+
+  const handleKeywordSearch = async () => {
+    const keywords = keywordState.query.split(',').map(k => k.trim()).filter(k => k);
+    if (keywords.length === 0) {
+      setKeywordState(prev => ({ ...prev, error: 'Please enter at least one keyword' }));
+      return;
+    }
+
+    setKeywordState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const queryParams = new URLSearchParams();
+      keywords.forEach(keyword => queryParams.append('keywords', keyword));
+      queryParams.append('search_mode', 'any');
+      queryParams.append('exact_match', 'false');
+      queryParams.append('case_sensitive', 'false');
+      queryParams.append('limit', '50');
+      queryParams.append('include_snippet', 'true');
+
+      const response = await fetch(
+        `/api/documents/search/keywords?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: KeywordSearchResponse = await response.json();
+      setKeywordState(prev => ({
+        ...prev,
+        results: data.results,
+        totalResults: data.total_results,
+        isLoading: false,
+      }));
+    } catch (err) {
+      console.error('Keyword search error:', err);
+      setKeywordState(prev => ({
+        ...prev,
+        error: 'Failed to perform keyword search. Please try again.',
+        results: [],
+        isLoading: false,
+      }));
+    }
+  };
 
   const handleSearch = async () => {
-    setIsLoading(true);
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    if (searchQuery.trim()) {
-      setSearchResults(mockSearchResults);
+    if (activeTab === 'semantic') {
+      await handleSemanticSearch();
     } else {
-      setSearchResults([]);
+      await handleKeywordSearch();
     }
-    
-    setIsLoading(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -68,6 +261,12 @@ export default function SearchPage() {
       handleSearch();
     }
   };
+
+  const handleQueryChange = (value: string) => {
+    updateCurrentState({ query: value });
+  };
+
+  const currentState = getCurrentState();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -79,28 +278,27 @@ export default function SearchPage() {
 
         {/* Search Interface */}
         <div className="space-y-6">
-          <Tabs defaultValue="semantic" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="semantic">Semantic Search</TabsTrigger>
               <TabsTrigger value="keyword">Keyword Search</TabsTrigger>
-              <TabsTrigger value="combined">Combined Search</TabsTrigger>
             </TabsList>
 
             <TabsContent value="semantic" className="space-y-4">
               <div className="space-y-4">
                 <Input
-                  placeholder="Enter your search query"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Enter your search query (e.g., 'machine learning neural networks')"
+                  value={semanticState.query}
+                  onChange={(e) => setSemanticState(prev => ({ ...prev, query: e.target.value }))}
                   onKeyDown={handleKeyDown}
                   className="text-base"
                 />
                 <Button 
-                  onClick={handleSearch}
-                  disabled={isLoading}
+                  onClick={handleSemanticSearch}
+                  disabled={semanticState.isLoading}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  {isLoading ? 'Searching...' : 'Search'}
+                  {semanticState.isLoading ? 'Searching...' : 'Search'}
                 </Button>
               </div>
             </TabsContent>
@@ -108,77 +306,109 @@ export default function SearchPage() {
             <TabsContent value="keyword" className="space-y-4">
               <div className="space-y-4">
                 <Input
-                  placeholder="Enter keywords separated by commas"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Enter keywords separated by commas (e.g., 'machine learning, neural networks, AI')"
+                  value={keywordState.query}
+                  onChange={(e) => setKeywordState(prev => ({ ...prev, query: e.target.value }))}
                   onKeyDown={handleKeyDown}
                   className="text-base"
                 />
+                <p className="text-sm text-gray-500">
+                  Keywords are searched in title (3x weight), keywords field (5x weight), and abstract (1x weight)
+                </p>
                 <Button 
-                  onClick={handleSearch}
-                  disabled={isLoading}
+                  onClick={handleKeywordSearch}
+                  disabled={keywordState.isLoading}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  {isLoading ? 'Searching...' : 'Search'}
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="combined" className="space-y-4">
-              <div className="space-y-4">
-                <Input
-                  placeholder="Enter search query combining semantic and keyword search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="text-base"
-                />
-                <Button 
-                  onClick={handleSearch}
-                  disabled={isLoading}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  {isLoading ? 'Searching...' : 'Search'}
+                  {keywordState.isLoading ? 'Searching...' : 'Search'}
                 </Button>
               </div>
             </TabsContent>
           </Tabs>
         </div>
 
+        {/* Error Message */}
+        {currentState.error && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <p className="text-red-600">{currentState.error}</p>
+          </div>
+        )}
+
         {/* Search Results */}
-        {searchResults.length > 0 && (
+        {currentState.results.length > 0 && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-900">Search Results</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-semibold text-gray-900">
+                {activeTab === 'semantic' ? 'Semantic Search Results' : 'Keyword Search Results'}
+              </h2>
+              <p className="text-gray-500">Found {currentState.totalResults} results</p>
+            </div>
             <div className="space-y-6">
-              {searchResults.map((result, index) => (
-                <Card key={index} className="hover:shadow-md transition-shadow">
+              {currentState.results.map((result, index) => (
+                <Card key={result.id || index} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900 leading-tight">
-                        Title: {result.title}
-                      </h3>
-                      <Button variant="outline" size="sm">
-                        View Details
-                      </Button>
+                      <button 
+                        onClick={() => router.push(`/papers/${result.id}`)}
+                        className="text-lg font-semibold text-gray-900 leading-tight flex-1 mr-4 text-left hover:text-blue-600 transition-colors cursor-pointer"
+                      >
+                        {result.title}
+                      </button>
+                      <div className="flex items-center space-x-2">
+                        {(result.relevance_score || result.similarity_score) && (
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                            Score: {(result.relevance_score || result.similarity_score)?.toFixed(3)}
+                          </Badge>
+                        )}
+                        {result.match_score && (
+                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                            Match: {result.match_score.toFixed(0)}%
+                          </Badge>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${result.id}`)}>
+                          View Details
+                        </Button>
+                      </div>
                     </div>
                     
                     <div className="space-y-3">
-                      <p className="text-gray-600 leading-relaxed">
-                        <span className="font-medium">Relevant Snippets:</span> {result.snippet}
-                      </p>
+                      {result.snippet && (
+                        <p className="text-gray-600 leading-relaxed">
+                          <span className="font-medium">Abstract:</span> {result.snippet}
+                        </p>
+                      )}
+                      
+                      {result.matched_keywords && result.matched_keywords.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          <span className="text-sm font-medium text-gray-700">Matched Keywords:</span>
+                          {result.matched_keywords.map((keyword, i) => (
+                            <Badge key={i} variant="outline" className="text-xs">
+                              {keyword}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                       
                       <div className="flex flex-wrap gap-2 text-sm text-gray-500">
                         <span>
                           <span className="font-medium">Authors:</span> {result.authors.join(', ')}
                         </span>
-                        <span>|</span>
-                        <span>
-                          <span className="font-medium">Journal:</span> {result.journal}
-                        </span>
-                        <span>|</span>
-                        <span>
-                          <span className="font-medium">Year:</span> {result.year}
-                        </span>
+                        {result.journal_name && (
+                          <>
+                            <span>|</span>
+                            <span>
+                              <span className="font-medium">Journal:</span> {result.journal_name}
+                            </span>
+                          </>
+                        )}
+                        {result.publication_year && (
+                          <>
+                            <span>|</span>
+                            <span>
+                              <span className="font-medium">Year:</span> {result.publication_year}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -186,54 +416,38 @@ export default function SearchPage() {
               ))}
             </div>
 
-            {/* Pagination */}
-            <div className="flex justify-center items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(currentPage - 1)}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              
-              <div className="flex space-x-1">
-                {[1, 2, 3].map((page) => (
-                  <Button
-                    key={page}
-                    variant={currentPage === page ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(page)}
-                    className={currentPage === page ? "bg-blue-600 hover:bg-blue-700" : ""}
-                  >
-                    {page}
-                  </Button>
-                ))}
-                <span className="px-2 py-1 text-gray-500">...</span>
+            {/* Pagination - simplified for now */}
+            {currentState.results.length > 0 && (
+              <div className="flex justify-center items-center space-x-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(10)}
+                  disabled={currentState.currentPage === 1}
+                  onClick={() => updateCurrentState({ currentPage: currentState.currentPage - 1 })}
                 >
-                  10
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                
+                <span className="px-4 py-2 text-sm text-gray-600">
+                  Page {currentState.currentPage}
+                </span>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => updateCurrentState({ currentPage: currentState.currentPage + 1 })}
+                >
+                  <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(currentPage + 1)}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
+            )}
           </div>
         )}
 
         {/* Empty State */}
-        {searchResults.length === 0 && searchQuery && !isLoading && (
+        {currentState.results.length === 0 && currentState.query && !currentState.isLoading && !currentState.error && (
           <div className="text-center py-12">
-            <p className="text-gray-500">No results found for "{searchQuery}". Try adjusting your search terms.</p>
+            <p className="text-gray-500">No results found for "{currentState.query}". Try adjusting your search terms.</p>
           </div>
         )}
       </div>

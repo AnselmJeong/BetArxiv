@@ -48,6 +48,13 @@ export function DocumentCard({ document, index = 0, onClick }: DocumentCardProps
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <Calendar className="w-3 h-3" />
             <span>{document.publication_year}</span>
+            {(document.volume || document.issue) && (
+              <span className="text-gray-400">
+                {document.volume && `Vol. ${document.volume}`}
+                {document.volume && document.issue && ', '}
+                {document.issue && `Issue ${document.issue}`}
+              </span>
+            )}
           </div>
           
           {document.journal_name && (

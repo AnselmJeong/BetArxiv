@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "allotment/dist/style.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -142,4 +143,23 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+}
+
+/* Allotment custom styles */
+.allotment-separator {
+  background-color: hsl(var(--border));
+  transition: background-color 0.2s ease;
+}
+
+.allotment-separator:hover {
+  background-color: hsl(var(--accent));
+}
+
+.allotment-separator-line {
+  background-color: hsl(var(--muted-foreground));
+  opacity: 0.3;
+}
+
+.allotment-separator:hover .allotment-separator-line {
+  opacity: 0.6;
 }

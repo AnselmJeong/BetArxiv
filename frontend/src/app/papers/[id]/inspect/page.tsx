@@ -1,78 +1,257 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import PDFViewer from '@/components/PDFViewer';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
+import ChatBox from '@/components/ChatBox';
+import { usePdfPath } from '@/hooks/usePdfPath';
+import { useParams } from 'next/navigation';
+import { Document } from '@/types/api';
+import { Allotment } from 'allotment';
+import 'allotment/dist/style.css';
 
-export default function PaperInspectPage() {
-  return (
-    <div className="h-full bg-muted/50 flex flex-col">
-      <div className="max-w-7xl mx-auto py-6 px-4 flex-1 flex flex-col min-h-0">
-        <div className="text-sm text-muted-foreground mb-4">
-          <span className="mr-2">Papers</span>/ <span className="ml-2">Paper Title</span>
-        </div>
-        <div className="flex gap-6 flex-1 min-h-0">
-          {/* PDF Viewer - 60% width */}
-          <Card className="w-3/5 overflow-hidden">
-            <PDFViewer pdfUrl="/sample.pdf" className="h-full" />
-          </Card>
-          {/* Metadata and Summary - 40% width */}
-          <div className="w-2/5 flex flex-col min-h-0">
-            <Card className="flex-1 p-6 flex flex-col min-h-[600px]">
-              <h1 className="text-3xl font-bold mb-4">Paper Title</h1>
-              <div className="text-muted-foreground mb-6">Authors: Author 1, Author 2, Author 3</div>
-              <div className="mb-6">
-                <h2 className="font-semibold text-lg mb-2">Abstract</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  This paper explores the application of machine learning techniques in the field of environmental science. 
-                  It focuses on predicting air quality using various meteorological parameters and pollutant concentrations. 
-                  Results demonstrate significant improvements over traditional methods with potential implications for urban planning. 
-                  The research contributes to the growing body of knowledge in environmental monitoring and provides practical 
-                  solutions for real-world air quality prediction challenges.
-                </p>
+interface PageProps {
+  params: { id: string };
+}
+
+export default function PaperInspectPage({ params }: PageProps) {
+  const { id: documentId } = useParams();
+  const { getPdfUrl } = usePdfPath();
+  const [document, setDocument] = useState<Document | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Fetch document data to get the actual file path
+  useEffect(() => {
+    const fetchDocument = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await fetch(`/api/documents/${documentId}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
+        }
+        
+        const data: Document = await response.json();
+        setDocument(data);
+      } catch (err) {
+        console.error('Error fetching document:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch document');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (documentId) {
+      fetchDocument();
+    }
+  }, [documentId]);
+
+  // Construct the PDF URL using the document's actual file path
+  const pdfUrl = document?.url ? getPdfUrl(documentId as string, document.url) : null;
+
+  if (loading) {
+    return (
+      <div className="h-full bg-muted/50 flex flex-col">
+        <div className="py-6 px-4 flex-1 flex flex-col min-h-0">
+          <div className="text-sm text-muted-foreground mb-4">
+            <span className="mr-2">Papers</span>/ <span className="ml-2">Loading...</span>
+          </div>
+          <div className="flex gap-6 flex-1 min-h-0">
+            <Card className="w-3/5 overflow-hidden">
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2 text-sm text-muted-foreground">Loading document...</p>
+                </div>
               </div>
-              <Tabs defaultValue="distinction" className="w-full flex-1 flex flex-col">
-                <TabsList className="grid grid-cols-3 mb-4">
-                  <TabsTrigger value="distinction">Distinction</TabsTrigger>
-                  <TabsTrigger value="methodology">Methodology</TabsTrigger>
-                  <TabsTrigger value="results">Results</TabsTrigger>
-                </TabsList>
-                <TabsContent value="distinction" className="flex-1">
-                  <h3 className="font-semibold mb-2">Distinction</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    This study stands out by integrating advanced machine learning techniques with traditional time series analysis, 
-                    offering a more nuanced approach to air quality prediction. Unlike previous studies that relied solely on 
-                    historical data patterns, this research incorporates real-time meteorological variables and advanced ensemble 
-                    methods to improve prediction accuracy. The novel integration of deep learning architectures with traditional 
-                    statistical models provides a comprehensive framework that addresses the limitations of existing approaches.
-                  </p>
-                </TabsContent>
-                <TabsContent value="methodology" className="flex-1">
-                  <h3 className="font-semibold mb-2">Methodology</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    The methodology employs a hybrid approach combining LSTM neural networks with ARIMA models to capture both 
-                    temporal dependencies and seasonal patterns in air quality data. Data preprocessing includes feature engineering 
-                    of meteorological variables, outlier detection, and normalization techniques. The model training process 
-                    utilizes cross-validation with temporal splits to ensure robust performance evaluation. Hyperparameter 
-                    optimization is conducted using Bayesian optimization techniques to achieve optimal model configuration.
-                  </p>
-                </TabsContent>
-                <TabsContent value="results" className="flex-1">
-                  <h3 className="font-semibold mb-2">Results</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    The proposed model achieved a 23% improvement in RMSE compared to baseline methods, with particularly 
-                    strong performance during high pollution episodes. Accuracy metrics show consistent performance across 
-                    different seasons and weather conditions. Feature importance analysis reveals that wind direction and 
-                    atmospheric pressure are the most significant predictors. The model demonstrates robust generalization 
-                    capabilities when tested on data from different geographic locations within the same urban area.
-                  </p>
-                </TabsContent>
-              </Tabs>
             </Card>
-            <div className="flex justify-center gap-4 mt-6">
-              <Button variant="secondary" className="px-6">Update Metadata</Button>
-              <Button className="px-6">Update Summary</Button>
+            <div className="w-2/5 flex flex-col min-h-0 gap-4">
+              <Card className="flex-[2] p-6 flex flex-col min-h-[400px]">
+                <div className="animate-pulse">
+                  <div className="h-8 bg-gray-200 rounded mb-4"></div>
+                  <div className="h-4 bg-gray-200 rounded mb-6"></div>
+                  <div className="h-32 bg-gray-200 rounded"></div>
+                </div>
+              </Card>
+              <Card className="flex-1 min-h-[200px]">
+                <div className="animate-pulse p-4">
+                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-16 bg-gray-200 rounded"></div>
+                </div>
+              </Card>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !document) {
+    return (
+      <div className="h-full bg-muted/50 flex flex-col">
+        <div className="py-6 px-4 flex-1 flex flex-col min-h-0">
+          <div className="text-sm text-muted-foreground mb-4">
+            <span className="mr-2">Papers</span>/ <span className="ml-2">Error</span>
+          </div>
+          <div className="flex items-center justify-center flex-1">
+            <div className="text-center">
+              <p className="text-red-600 mb-4">Error loading document: {error || 'Document not found'}</p>
+              <Button onClick={() => window.location.reload()} variant="outline">
+                Retry
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full bg-muted/50 flex flex-col">
+      <div className="py-6 px-4 flex-1 flex flex-col min-h-0">
+        <div className="text-sm text-muted-foreground mb-4">
+          <span className="mr-2">Papers</span>/ <span className="ml-2">{document.title}</span>
+        </div>
+        
+        {/* Main Resizable Layout: PDF Viewer + Right Column */}
+        <div className="flex-1 min-h-0">
+          <Allotment defaultSizes={[60, 40]} minSize={300}>
+            {/* PDF Viewer */}
+            <Allotment.Pane>
+              <Card className="h-full overflow-hidden mr-2">
+                {pdfUrl ? (
+                  <PDFViewer pdfUrl={pdfUrl} className="h-full" />
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-muted-foreground">PDF file path not available</p>
+                  </div>
+                )}
+              </Card>
+            </Allotment.Pane>
+            
+            {/* Right Column with Summary + Chat */}
+            <Allotment.Pane>
+              <div className="h-full ml-2">
+                <Allotment vertical defaultSizes={[65, 35]} minSize={150}>
+                  {/* Summary Section */}
+                  <Allotment.Pane>
+                    <Card className="h-full p-4 flex flex-col min-h-0 overflow-hidden mb-2">
+                      <Tabs defaultValue="summary" className="w-full h-full flex flex-col min-h-0 overflow-hidden">
+                        <div className="mb-3 flex-shrink-0">
+                          <TabsList className="grid grid-cols-4 mb-2 w-full text-xs">
+                            <TabsTrigger value="summary" className="text-xs">Summary</TabsTrigger>
+                            <TabsTrigger value="previous_work" className="text-xs">Previous</TabsTrigger>
+                            <TabsTrigger value="hypothesis" className="text-xs">Hypothesis</TabsTrigger>
+                            <TabsTrigger value="distinction" className="text-xs">Distinction</TabsTrigger>
+                          </TabsList>
+                          <TabsList className="grid grid-cols-4 w-full text-xs">
+                            <TabsTrigger value="methodology" className="text-xs">Method</TabsTrigger>
+                            <TabsTrigger value="results" className="text-xs">Results</TabsTrigger>
+                            <TabsTrigger value="limitations" className="text-xs">Limits</TabsTrigger>
+                            <TabsTrigger value="implications" className="text-xs">Implications</TabsTrigger>
+                          </TabsList>
+                        </div>
+                        <div className="flex-1 min-h-0 overflow-hidden">
+                          <TabsContent value="summary" className="h-full overflow-y-auto pr-2">
+                            <h3 className="font-semibold mb-2 text-sm">Summary</h3>
+                            <div className="text-xs text-muted-foreground leading-relaxed">
+                              {document.summary ? (
+                                <MarkdownRenderer content={document.summary} />
+                              ) : (
+                                <p>No summary information available.</p>
+                              )}
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="previous_work" className="h-full overflow-y-auto pr-2">
+                            <h3 className="font-semibold mb-2 text-sm">Previous Work</h3>
+                            <div className="text-xs text-muted-foreground leading-relaxed">
+                              {document.previous_work ? (
+                                <MarkdownRenderer content={document.previous_work} />
+                              ) : (
+                                <p>No previous work information available.</p>
+                              )}
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="hypothesis" className="h-full overflow-y-auto pr-2">
+                            <h3 className="font-semibold mb-2 text-sm">Hypothesis</h3>
+                            <div className="text-xs text-muted-foreground leading-relaxed">
+                              {document.hypothesis ? (
+                                <MarkdownRenderer content={document.hypothesis} />
+                              ) : (
+                                <p>No hypothesis information available.</p>
+                              )}
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="distinction" className="h-full overflow-y-auto pr-2">
+                            <h3 className="font-semibold mb-2 text-sm">Distinction</h3>
+                            <div className="text-xs text-muted-foreground leading-relaxed">
+                              {document.distinction ? (
+                                <MarkdownRenderer content={document.distinction} />
+                              ) : (
+                                <p>No distinction information available.</p>
+                              )}
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="methodology" className="h-full overflow-y-auto pr-2">
+                            <h3 className="font-semibold mb-2 text-sm">Methodology</h3>
+                            <div className="text-xs text-muted-foreground leading-relaxed">
+                              {document.methodology ? (
+                                <MarkdownRenderer content={document.methodology} />
+                              ) : (
+                                <p>No methodology information available.</p>
+                              )}
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="results" className="h-full overflow-y-auto pr-2">
+                            <h3 className="font-semibold mb-2 text-sm">Results</h3>
+                            <div className="text-xs text-muted-foreground leading-relaxed">
+                              {document.results ? (
+                                <MarkdownRenderer content={document.results} />
+                              ) : (
+                                <p>No results information available.</p>
+                              )}
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="limitations" className="h-full overflow-y-auto pr-2">
+                            <h3 className="font-semibold mb-2 text-sm">Limitations</h3>
+                            <div className="text-xs text-muted-foreground leading-relaxed">
+                              {document.limitations ? (
+                                <MarkdownRenderer content={document.limitations} />
+                              ) : (
+                                <p>No limitations information available.</p>
+                              )}
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="implications" className="h-full overflow-y-auto pr-2">
+                            <h3 className="font-semibold mb-2 text-sm">Implications</h3>
+                            <div className="text-xs text-muted-foreground leading-relaxed">
+                              {document.implications ? (
+                                <MarkdownRenderer content={document.implications} />
+                              ) : (
+                                <p>No implications information available.</p>
+                              )}
+                            </div>
+                          </TabsContent>
+                        </div>
+                      </Tabs>
+                    </Card>
+                  </Allotment.Pane>
+                  
+                  {/* Chat Section */}
+                  <Allotment.Pane>
+                    <div className="h-full mt-2">
+                      <ChatBox documentId={documentId as string} />
+                    </div>
+                  </Allotment.Pane>
+                </Allotment>
+              </div>
+            </Allotment.Pane>
+          </Allotment>
         </div>
       </div>
     </div>

@@ -3,7 +3,8 @@ uvicorn
 psycopg[pool]
 pydantic
 docling
-ollama-python
+google-genai
 watchdog
 numpy
-python-dotenv 
+python-dotenv
+httpx 

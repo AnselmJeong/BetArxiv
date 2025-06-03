@@ -1,0 +1,93 @@
+ === DEBUG: First page text from docs/Agent-Based Modeling, Simulation/2025 - Zhao et al. - SiriuS Self-improving Multi-agent Systems via Bootstrapped Reasoning.pdf ===
+
+SiriuS: Self-improving Multi-agent Systems via Bootstrapped Reasoning
+Wanjia Zhao1 Mert Yuksekgonul1 Shirley Wu1 James Zou 1
+Abstract
+Multi-agent AI systems powered by large lan-
+guage models (LLMs) are increasingly applied
+to solve complex tasks. However, these sys-
+tems often rely on fragile, manually designed
+prompts and heuristics, making optimization dif-
+ficult. A key challenge in optimizing multi-agent
+systems is acquiring suitable training data for
+specialized agents. We introduce SIRIU S, a self-
+improving, reasoning-driven optimization frame-
+work for multi-agent systems. Central to our ap-
+proach is the construction of an experience library:
+a repository of high-quality reasoning trajectories.
+The library is built by retaining reasoning steps
+that lead to successful outcomes, providing a ro-
+bust training set for optimizing multi-agent sys-
+tem. Additionally, we introduce a library augmen-
+tation procedure that refines unsuccessful trajecto-
+ries, further enriching the library. SIRIU S boosts
+performance by 2.86% to 21.88% on reasoning
+and biomedical QA and enhances agent negoti-
+ation in competitive settings. Our results show
+that SIRIU S enhances multi-agent performance
+while generating reusable data for self-correction
+and self-play enhancement in the future. Code are
+available here.
+1. Introduction
+Multi-agent AI systems powered by large language mod-
+els (LLMs), where specialized agents collaborate to solve
+complex tasks, are becoming increasingly successful in real-
+world applications. Recent work has demonstrated their ef-
+fectiveness in complex reasoning (Wang et al., 2024a; Smit
+et al., 2024), coding (Wu et al., 2023), drug discovery (Swan-
+son et al., 2024) and ensuring safety via debate (Chern et al.,
+2024; Irving et al., 2018). These successes arise from spe-
+cialized agents integrating their distinct capabilities through
+structured interactions, enabling more effective problem-
+solving than single agents. Moreover, multi-agent scrutiny
+acts as a built-in self-correction mechanism, where agents
+1Stanford University. Correspondence to: Wanjia Zhao <wanji-
+azh@cs.stanford.edu>, James Zou <jamesz@cs.stanford.edu>.
+refine and verify each other’s outputs. This often outper-
+forms single agent setting, particularly on tasks demanding
+rigorous reasoning or factual validation.
+Despite these successes, optimizing multi-agent systems
+remains a fundamental challenge due to (1) the difficulty
+of acquiring appropriate training signals for each agent and
+(2) the sensitivity to multiple moving parts that influence
+overall performance (Smit et al., 2024). While task-level re-
+ward feedback is available, credit assignment across agents
+remains ambiguous—it is unclear how to attribute success
+or failure to specific intermediate decisions and reasoning
+steps made by each LLM agent. This challenge parallels
+the multi-agent credit assignment problem in reinforcement
+learning (Foerster et al., 2018). However, in language-based
+systems, reasoning unfolds through complex and unstruc-
+tured interactions, making attribution far more difficult than
+in traditional RL settings with well-defined action spaces.
+We presentSIRIU S, a framework for learning effective multi-
+agent behaviors from outcome rewards. Our key insight is
+that when multiple agents successfully solve a task together,
+their entire interaction trajectory likely contains useful pat-
+terns - even if we cannot pinpoint exactly which steps or
+decisions were crucial for success. Drawing inspiration from
+recent advances in bootstrapping reasoning capabilities (Ze-
+likman et al., 2022), we collect and learn from successful
+agent interactions across many tasks, allowing the system to
+iteratively discover effective collaboration strategies from
+self-generated data. This approach sidesteps the need for di-
+rect supervision of intermediate steps, instead letting agents
+learn which interaction patterns tend to lead to successful
+outcomes. For trajectories that result in failed attempts, we
+perform trajectory augmentation by resampling original at-
+tempts with feedback from an additional agent grounded in
+the ground truth.
+Our experiments demonstrate that SIRIU S significantly en-
+hances multi-agent performance across multiple domains. It
+improves reasoning and biomedical QA accuracy by 2.86%
+to 21.88%, while also strengthening agent negotiation in
+competitive scenarios. Beyond these gains, our approach
+offers a scalable mechanism for self-improvement, enabling
+agents to iteratively refine their reasoning and collaboration
+strategies. More broadly, SIRIU S provides a general frame-
+work for optimizing multi-agent systems via self-generated
+synthetic data, offering a principled way to enhance perfor-
+1
+arXiv:2502.04780v1  [cs.AI]  7 Feb 2025
+
+=== End of text (4777 characters) ===

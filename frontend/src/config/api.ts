@@ -1,7 +1,7 @@
 // API Configuration
 export const API_CONFIG = {
-  // Base URL for the FastAPI backend (includes /api prefix)
-  baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
+  // Base URL for the FastAPI backend (Next.js proxy handles forwarding to localhost:8000)
+  baseUrl: process.env.NEXT_PUBLIC_API_URL || '/api',
   
   // Default request timeout in milliseconds
   timeout: 10000,

@@ -55,10 +55,6 @@ async def lifespan(app: FastAPI):
         await db.connect()
         logger.info("Database connected successfully.")
 
-        # Include the router after database connection
-        app.include_router(get_router(db), prefix="/api")
-        logger.info("API routes registered.")
-
         yield
     except Exception as e:
         logger.error(f"Failed to start application: {e}")
@@ -88,6 +84,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include the router after app creation
+app.include_router(get_router(db))
+logger.info("API routes registered.")
 
 
 # Add a test endpoint

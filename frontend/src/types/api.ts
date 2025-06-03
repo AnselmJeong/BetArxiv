@@ -4,14 +4,26 @@ export interface Document {
   id: string;
   title: string;
   authors: string[];
-  journal_name: string;
-  publication_year: number;
-  abstract: string;
-  folder_name: string;
+  journal_name?: string;
+  publication_year?: number;
+  abstract?: string;
+  folder_name?: string;
   keywords?: string[];
   volume?: string;
   issue?: string;
   status?: string;
+  url?: string;
+  doi?: string;
+  arxiv_id?: string;
+  // Summary fields
+  summary?: string;
+  previous_work?: string;
+  hypothesis?: string;
+  distinction?: string;
+  methodology?: string;
+  results?: string;
+  limitations?: string;
+  implications?: string;
 }
 
 export interface DocumentSummary {
@@ -42,6 +54,28 @@ export interface SearchRequest {
   filters?: SearchFilters;
 }
 
+export interface SearchResult {
+  id: string;
+  title: string;
+  authors: string[];
+  similarity_score?: number;
+  relevance_score?: number;
+  match_score?: number;
+  snippet?: string;
+  journal_name?: string;
+  publication_year?: number;
+  abstract?: string;
+  keywords?: string[];
+  matched_keywords?: string[];
+  folder_name?: string;
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+  query: string;
+  total_results: number;
+}
+
 export interface KeywordSearchRequest {
   keywords: string[];
   search_mode: "any" | "all";
@@ -51,15 +85,13 @@ export interface KeywordSearchRequest {
   folder_name?: string;
 }
 
-export interface CombinedSearchRequest {
-  text_query?: string;
-  keywords?: string[];
-  keyword_mode?: "any" | "all";
-  exact_keyword_match?: boolean;
-  folder_name?: string;
-  filters?: SearchFilters;
-  limit?: number;
-  include_snippet?: boolean;
+export interface KeywordSearchResponse {
+  results: SearchResult[];
+  query_keywords: string[];
+  search_mode: string;
+  total_results: number;
+  exact_match: boolean;
+  case_sensitive: boolean;
 }
 
 export interface Folder {

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Maximize2 } from 'lucide-react';
 
 // Import react-pdf CSS
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -26,6 +26,17 @@ export default function PDFViewer({ pdfUrl, className = '' }: PDFViewerProps) {
   const [rotation, setRotation] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFitWidth, setIsFitWidth] = useState<boolean>(true);
+  const [pageWidth, setPageWidth] = useState<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const calculateFitWidthScale = useCallback(() => {
+    if (!containerRef.current || !pageWidth) return 1.0;
+    
+    const containerWidth = containerRef.current.clientWidth - 32; // padding
+    const calculatedScale = containerWidth / pageWidth;
+    return Math.max(0.5, Math.min(3.0, calculatedScale));
+  }, [pageWidth]);
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -39,6 +50,35 @@ export default function PDFViewer({ pdfUrl, className = '' }: PDFViewerProps) {
     setLoading(false);
   }, []);
 
+  const onPageLoadSuccess = useCallback((page: any) => {
+    if (page.originalWidth) {
+      setPageWidth(page.originalWidth);
+    }
+  }, []);
+
+  // Update scale when container size changes or page width changes (for fit width mode)
+  useEffect(() => {
+    if (isFitWidth && pageWidth > 0) {
+      const newScale = calculateFitWidthScale();
+      setScale(newScale);
+    }
+  }, [isFitWidth, pageWidth, calculateFitWidthScale]);
+
+  // Handle window resize for fit width mode
+  useEffect(() => {
+    if (!isFitWidth) return;
+
+    const handleResize = () => {
+      if (pageWidth > 0) {
+        const newScale = calculateFitWidthScale();
+        setScale(newScale);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isFitWidth, pageWidth, calculateFitWidthScale]);
+
   const goToPrevPage = () => {
     setPageNumber(prev => Math.max(1, prev - 1));
   };
@@ -48,10 +88,12 @@ export default function PDFViewer({ pdfUrl, className = '' }: PDFViewerProps) {
   };
 
   const zoomIn = () => {
+    setIsFitWidth(false);
     setScale(prev => Math.min(3.0, prev + 0.2));
   };
 
   const zoomOut = () => {
+    setIsFitWidth(false);
     setScale(prev => Math.max(0.5, prev - 0.2));
   };
 
@@ -62,6 +104,15 @@ export default function PDFViewer({ pdfUrl, className = '' }: PDFViewerProps) {
   const resetView = () => {
     setScale(1.0);
     setRotation(0);
+    setIsFitWidth(false);
+  };
+
+  const fitWidth = () => {
+    setIsFitWidth(true);
+    if (pageWidth > 0) {
+      const newScale = calculateFitWidthScale();
+      setScale(newScale);
+    }
   };
 
   if (error) {
@@ -113,6 +164,14 @@ export default function PDFViewer({ pdfUrl, className = '' }: PDFViewerProps) {
           <Button variant="outline" size="sm" onClick={zoomIn} disabled={scale >= 3.0}>
             <ZoomIn className="w-4 h-4" />
           </Button>
+          <Button 
+            variant={isFitWidth ? "default" : "outline"} 
+            size="sm" 
+            onClick={fitWidth}
+            title="Fit Width"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </Button>
           <Button variant="outline" size="sm" onClick={rotate}>
             <RotateCw className="w-4 h-4" />
           </Button>
@@ -123,7 +182,10 @@ export default function PDFViewer({ pdfUrl, className = '' }: PDFViewerProps) {
       </div>
 
       {/* PDF Document */}
-      <div className="flex-1 overflow-auto bg-gray-100 flex items-center justify-center p-4">
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-auto bg-gray-100 flex items-center justify-center p-4"
+      >
         <div className="bg-white shadow-lg">
           <Document
             file={pdfUrl}
@@ -149,6 +211,7 @@ export default function PDFViewer({ pdfUrl, className = '' }: PDFViewerProps) {
               rotate={rotation}
               renderTextLayer={false}
               renderAnnotationLayer={false}
+              onLoadSuccess={onPageLoadSuccess}
               loading={
                 <div className="flex items-center justify-center h-96 w-96">
                   <div className="animate-pulse bg-gray-200 h-full w-full"></div>

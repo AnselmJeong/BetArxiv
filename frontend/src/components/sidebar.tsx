@@ -26,7 +26,7 @@ interface SidebarItem {
 const sidebarItems: SidebarItem[] = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/papers', label: 'Browse', icon: FileText },
-  { href: '/library', label: 'Library', icon: FolderOpen },
+  { href: '/archive', label: 'Archive', icon: FolderOpen },
   { href: '/search', label: 'Search', icon: Search },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/help', label: 'Help', icon: HelpCircle },
@@ -81,7 +81,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           {sidebarItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || 
-              (item.href === '/library' && pathname.startsWith('/library'));
+              (item.href === '/archive' && pathname.startsWith('/archive'));
             
             return (
               <li key={item.href}>

@@ -1,25 +1,27 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSettings } from '@/contexts/settings-context';
 
 export default function SettingsPage() {
-  const [llmProvider, setLlmProvider] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [displayMode, setDisplayMode] = useState('light');
-  const [rootDirectory, setRootDirectory] = useState('');
+  const {
+    llmProvider,
+    setLlmProvider,
+    apiKey,
+    setApiKey,
+    displayMode,
+    setDisplayMode,
+    baseDirectory,
+    setBaseDirectory,
+    saveSettings,
+  } = useSettings();
 
   const handleSaveSettings = () => {
-    // TODO: Implement save functionality
-    console.log('Saving settings:', {
-      llmProvider,
-      apiKey,
-      displayMode,
-      rootDirectory,
-    });
+    saveSettings();
+    // TODO: You can add additional save functionality here like syncing with backend
   };
 
   return (
@@ -91,17 +93,17 @@ export default function SettingsPage() {
 
         {/* Root Directory Section */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900">Root Directory</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Base Directory of Archive</h2>
           
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">
-              Root Directory
+              Base Directory of Archive
             </label>
             <Input
               type="text"
-              placeholder="Enter root directory path"
-              value={rootDirectory}
-              onChange={(e) => setRootDirectory(e.target.value)}
+              placeholder="Enter base directory of pdf archive"
+              value={baseDirectory}
+              onChange={(e) => setBaseDirectory(e.target.value)}
               className="max-w-md"
             />
           </div>

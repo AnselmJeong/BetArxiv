@@ -34,16 +34,16 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* My Library Section */}
+        {/* My Archive Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">My Library</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">My Archive</h1>
           <p className="text-gray-600 mb-6">Welcome back, Sarah! Here's a summary of your paper collection.</p>
           
           <form onSubmit={handleSearch} className="relative mb-8">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <Input
               type="search"
-              placeholder="Search your library"
+              placeholder="Search your archive"
               className="pl-12 pr-4 py-3 w-full max-w-2xl bg-white border border-gray-200 rounded-lg text-lg"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -82,7 +82,7 @@ export default function Home() {
             <div className="text-center py-12">
               <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No papers yet</h3>
-              <p className="text-gray-500">Start by adding some research papers to your library.</p>
+              <p className="text-gray-500">Start by adding some research papers to your archive.</p>
             </div>
           )}
         </div>

@@ -13,6 +13,8 @@ class DocumentBase(BaseModel):
     volume: Optional[str] = None
     issue: Optional[str] = None
     url: Optional[str] = None  # filepath in storage
+    doi: Optional[str] = None  # DOI identifier
+    arxiv_id: Optional[str] = None  # arXiv identifier
 
 
 class DocumentCreate(DocumentBase):
@@ -45,6 +47,8 @@ class DocumentMetadata(BaseModel):
     volume: Optional[str] = None
     issue: Optional[str] = None
     url: Optional[str] = None
+    doi: Optional[str] = None
+    arxiv_id: Optional[str] = None
     markdown: Optional[str] = None
 
 
@@ -72,6 +76,12 @@ class DocumentListItem(BaseModel):
     publication_year: Optional[int]
     abstract: Optional[str]
     folder_name: Optional[str]
+    doi: Optional[str]
+    arxiv_id: Optional[str]
+    volume: Optional[str]
+    issue: Optional[str]
+    url: Optional[str]
+    keywords: Optional[List[str]]
 
 
 class DocumentListResponse(BaseModel):
@@ -92,6 +102,10 @@ class SearchResult(BaseModel):
     id: UUID
     title: str
     authors: List[str]
+    journal_name: Optional[str] = None
+    publication_year: Optional[int] = None
+    folder_name: Optional[str] = None
+    keywords: Optional[List[str]] = None
     similarity_score: float
     snippet: Optional[str] = None
 
@@ -112,6 +126,7 @@ class DocumentFilters(BaseModel):
 class FolderInfo(BaseModel):
     name: str
     path: str
+    document_count: int = 0
 
 
 class FoldersResponse(BaseModel):
@@ -150,6 +165,8 @@ class UpdateMetadataRequest(BaseModel):
     volume: Optional[str] = None
     issue: Optional[str] = None
     url: Optional[str] = None
+    doi: Optional[str] = None
+    arxiv_id: Optional[str] = None
     markdown: Optional[str] = None
 
 
@@ -234,9 +251,12 @@ class KeywordSearchResult(BaseModel):
     keywords: List[str]
     matched_keywords: List[str]
     match_score: float  # Percentage of keywords matched
+    relevance_score: Optional[float] = None  # Weighted relevance score
     snippet: Optional[str] = None
     folder_name: Optional[str] = None
     abstract: Optional[str] = None
+    journal_name: Optional[str] = None
+    publication_year: Optional[int] = None
 
 
 class KeywordSearchResponse(BaseModel):
@@ -248,24 +268,19 @@ class KeywordSearchResponse(BaseModel):
     case_sensitive: bool
 
 
-class CombinedSearchQuery(BaseModel):
-    text_query: Optional[str] = Field(
-        default=None, description="Text query for title/abstract search"
-    )
-    keywords: Optional[List[str]] = Field(
-        default=None, description="Keywords to search for"
-    )
-    keyword_mode: str = Field(
-        default="any", description="Keyword search mode: 'any' or 'all'"
-    )
-    exact_keyword_match: bool = Field(
-        default=False, description="Exact keyword matching"
-    )
-    folder_name: Optional[str] = Field(
-        default=None, description="Optional folder filter"
-    )
-    filters: Optional[Dict[str, Any]] = Field(
-        default=None, description="Additional metadata filters"
-    )
-    limit: int = Field(default=20, ge=1, le=100, description="Maximum results")
-    include_snippet: bool = Field(default=True, description="Include snippets")
+# Chat models
+class ChatMessage(BaseModel):
+    id: str
+    content: str
+    role: str  # 'user' or 'assistant'
+    timestamp: str
+
+
+class ChatRequest(BaseModel):
+    message: str
+    document_id: UUID
+
+
+class ChatResponse(BaseModel):
+    message: ChatMessage
+    answer: str
