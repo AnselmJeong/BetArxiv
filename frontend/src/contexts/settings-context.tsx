@@ -22,7 +22,7 @@ interface SettingsProviderProps {
 }
 
 const DEFAULT_SETTINGS = {
-  baseDirectory: '/Volumes/Aquatope/_DEV_/BetArxiv/docs',
+  baseDirectory: '/Volumes/Library/Archive',
   llmProvider: '',
   apiKey: '',
   displayMode: 'light' as 'light' | 'dark',

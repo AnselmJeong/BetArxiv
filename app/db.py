@@ -260,7 +260,7 @@ class Database:
                    volume, issue, url, abstract, keywords, folder_name, doi, arxiv_id
             FROM documents
             {where_clause}
-            ORDER BY publication_year DESC, title
+            ORDER BY created_at DESC, title
             LIMIT %s OFFSET %s
         """
 
@@ -327,6 +327,7 @@ class Database:
                         publication_year,
                         folder_name,
                         keywords,
+                        url,
                         (
                             0.7 * (1 - (title_embedding <=> %s::vector)) +
                             0.3 * (1 - (abstract_embedding <=> %s::vector))
@@ -353,11 +354,11 @@ class Database:
                     # Generate snippet from abstract
                     snippet = None
                     if row.get("abstract"):
-                        abstract = row["abstract"]
-                        if len(abstract) > 200:
-                            snippet = abstract[:200] + "..."
-                        else:
-                            snippet = abstract
+                        snippet = row["abstract"]
+                        # if len(abstract) > 200:
+                        #     snippet = abstract[:200] + "..."
+                        # else:
+                        #     snippet = abstract
 
                     results.append(
                         {
@@ -370,6 +371,7 @@ class Database:
                             "keywords": row.get("keywords"),
                             "similarity_score": round(row["similarity_score"], 3),
                             "snippet": snippet,
+                            "url": row.get("url"),
                         }
                     )
 
@@ -412,7 +414,7 @@ class Database:
         )
 
         search_query = f"""
-            SELECT id, title, authors, abstract, journal_name, publication_year, folder_name, keywords,
+            SELECT id, title, authors, abstract, journal_name, publication_year, folder_name, keywords, url,
                    (
                        CASE WHEN title ILIKE %s THEN 0.8 ELSE 0 END +
                        CASE WHEN abstract ILIKE %s THEN 0.5 ELSE 0 END +
@@ -465,6 +467,7 @@ class Database:
                         "keywords": row.get("keywords"),
                         "similarity_score": row["similarity_score"],
                         "snippet": snippet,
+                        "url": row.get("url"),
                     }
                 )
 
@@ -689,7 +692,7 @@ class Database:
         query = f"""
             SELECT 
                 id, title, authors, journal_name, publication_year,
-                abstract, keywords, folder_name,
+                abstract, keywords, folder_name, url,
                 ({relevance_score}) as relevance_score
             FROM documents
             {where_clause}

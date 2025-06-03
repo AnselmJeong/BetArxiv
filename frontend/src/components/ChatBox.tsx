@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Send, Bot, User } from 'lucide-react';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 
 interface ChatMessage {
   id: string;
@@ -119,7 +120,11 @@ export default function ChatBox({ documentId }: ChatBoxProps) {
                     : 'bg-gray-100 text-gray-900'
                 }`}
               >
-                {message.content}
+                {message.role === 'assistant' ? (
+                  <MarkdownRenderer content={message.content} />
+                ) : (
+                  message.content
+                )}
               </div>
               {message.role === 'user' && (
                 <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">

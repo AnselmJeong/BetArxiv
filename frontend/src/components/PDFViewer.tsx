@@ -184,7 +184,9 @@ export default function PDFViewer({ pdfUrl, className = '' }: PDFViewerProps) {
       {/* PDF Document */}
       <div 
         ref={containerRef}
-        className="flex-1 overflow-auto bg-gray-100 flex items-center justify-center p-4"
+        className={`flex-1 overflow-auto bg-gray-100 flex justify-center p-4 ${
+          isFitWidth ? 'items-start' : 'items-center'
+        }`}
       >
         <div className="bg-white shadow-lg">
           <Document

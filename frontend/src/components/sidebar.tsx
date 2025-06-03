@@ -24,10 +24,9 @@ interface SidebarItem {
 }
 
 const sidebarItems: SidebarItem[] = [
-  { href: '/', label: 'Home', icon: Home },
   { href: '/papers', label: 'Browse', icon: FileText },
-  { href: '/archive', label: 'Archive', icon: FolderOpen },
   { href: '/search', label: 'Search', icon: Search },
+  { href: '/archive', label: 'Archive', icon: FolderOpen },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/help', label: 'Help', icon: HelpCircle },
 ];

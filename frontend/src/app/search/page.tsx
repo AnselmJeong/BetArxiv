@@ -1,13 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Search, FileText } from 'lucide-react';
 import { SearchResult, SearchResponse, KeywordSearchResponse } from '@/types/api';
 
 interface TabState {
@@ -84,6 +90,56 @@ const loadStringFromLocalStorage = (key: string, defaultValue: string): string =
 
 export default function SearchPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // 항상 기본값으로 초기화하여 hydration 문제 해결
+  const [activeTab, setActiveTab] = useState('semantic');
+  const [semanticState, setSemanticState] = useState<TabState>(initialTabState);
+  const [keywordState, setKeywordState] = useState<TabState>(initialTabState);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // 컴포넌트 마운트 후 localStorage에서 상태 복원
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // URL 파라미터 확인
+      const urlTab = searchParams.get('tab');
+      const urlQuery = searchParams.get('query');
+      
+      // localStorage에서 기본값 로드
+      const savedActiveTab = loadStringFromLocalStorage('search-active-tab', 'semantic');
+      const savedSemanticState = loadFromLocalStorage('search-semantic-state', initialTabState);
+      const savedKeywordState = loadFromLocalStorage('search-keyword-state', initialTabState);
+      
+      // URL 파라미터가 있으면 우선적으로 사용
+      if (urlTab && (urlTab === 'semantic' || urlTab === 'keyword')) {
+        setActiveTab(urlTab);
+        
+        if (urlQuery) {
+          if (urlTab === 'semantic') {
+            const newSemanticState = { ...savedSemanticState, query: urlQuery };
+            setSemanticState(newSemanticState);
+            // 자동으로 검색 수행
+            setTimeout(() => performSemanticSearchWithQuery(urlQuery), 100);
+          } else {
+            const newKeywordState = { ...savedKeywordState, query: urlQuery };
+            setKeywordState(newKeywordState);
+            // 자동으로 검색 수행
+            setTimeout(() => performKeywordSearchWithQuery(urlQuery), 100);
+          }
+        } else {
+          setSemanticState(savedSemanticState);
+          setKeywordState(savedKeywordState);
+        }
+      } else {
+        // URL 파라미터가 없으면 localStorage 값 사용
+        setActiveTab(savedActiveTab);
+        setSemanticState(savedSemanticState);
+        setKeywordState(savedKeywordState);
+      }
+      
+      setIsLoaded(true);
+    }
+  }, [searchParams]);
   
   // localStorage 정리 (한 번만 실행)
   useEffect(() => {
@@ -118,32 +174,25 @@ export default function SearchPage() {
       cleanupLocalStorage();
     }
   }, []);
-  
-  // localStorage에서 직접 초기값 읽어오기
-  const [activeTab, setActiveTab] = useState(() => 
-    loadStringFromLocalStorage('search-active-tab', 'semantic')
-  );
-  
-  const [semanticState, setSemanticState] = useState<TabState>(() => 
-    loadFromLocalStorage('search-semantic-state', initialTabState)
-  );
-  
-  const [keywordState, setKeywordState] = useState<TabState>(() => 
-    loadFromLocalStorage('search-keyword-state', initialTabState)
-  );
 
-  // 상태 변경시 localStorage에 저장
+  // 상태 변경시 localStorage에 저장 (로드 완료 후에만)
   useEffect(() => {
-    localStorage.setItem('search-semantic-state', JSON.stringify(semanticState));
-  }, [semanticState]);
+    if (isLoaded) {
+      localStorage.setItem('search-semantic-state', JSON.stringify(semanticState));
+    }
+  }, [semanticState, isLoaded]);
 
   useEffect(() => {
-    localStorage.setItem('search-keyword-state', JSON.stringify(keywordState));
-  }, [keywordState]);
+    if (isLoaded) {
+      localStorage.setItem('search-keyword-state', JSON.stringify(keywordState));
+    }
+  }, [keywordState, isLoaded]);
 
   useEffect(() => {
-    localStorage.setItem('search-active-tab', activeTab);
-  }, [activeTab]);
+    if (isLoaded) {
+      localStorage.setItem('search-active-tab', activeTab);
+    }
+  }, [activeTab, isLoaded]);
 
   const getCurrentState = () => {
     return activeTab === 'semantic' ? semanticState : keywordState;
@@ -200,6 +249,92 @@ export default function SearchPage() {
 
   const handleKeywordSearch = async () => {
     const keywords = keywordState.query.split(',').map(k => k.trim()).filter(k => k);
+    if (keywords.length === 0) {
+      setKeywordState(prev => ({ ...prev, error: 'Please enter at least one keyword' }));
+      return;
+    }
+
+    setKeywordState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const queryParams = new URLSearchParams();
+      keywords.forEach(keyword => queryParams.append('keywords', keyword));
+      queryParams.append('search_mode', 'any');
+      queryParams.append('exact_match', 'false');
+      queryParams.append('case_sensitive', 'false');
+      queryParams.append('limit', '50');
+      queryParams.append('include_snippet', 'true');
+
+      const response = await fetch(
+        `/api/documents/search/keywords?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: KeywordSearchResponse = await response.json();
+      setKeywordState(prev => ({
+        ...prev,
+        results: data.results,
+        totalResults: data.total_results,
+        isLoading: false,
+      }));
+    } catch (err) {
+      console.error('Keyword search error:', err);
+      setKeywordState(prev => ({
+        ...prev,
+        error: 'Failed to perform keyword search. Please try again.',
+        results: [],
+        isLoading: false,
+      }));
+    }
+  };
+
+  const performSemanticSearchWithQuery = async (query: string) => {
+    setSemanticState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const response = await fetch(
+        `/api/documents/search?query=${encodeURIComponent(query)}&k=20`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: SearchResponse = await response.json();
+      setSemanticState(prev => ({
+        ...prev,
+        results: data.results,
+        totalResults: data.total_results,
+        isLoading: false,
+      }));
+    } catch (err) {
+      console.error('Semantic search error:', err);
+      setSemanticState(prev => ({
+        ...prev,
+        error: 'Failed to perform semantic search. Please try again.',
+        results: [],
+        isLoading: false,
+      }));
+    }
+  };
+
+  const performKeywordSearchWithQuery = async (query: string) => {
+    const keywords = query.split(',').map(k => k.trim()).filter(k => k);
     if (keywords.length === 0) {
       setKeywordState(prev => ({ ...prev, error: 'Please enter at least one keyword' }));
       return;
@@ -343,78 +478,140 @@ export default function SearchPage() {
               </h2>
               <p className="text-gray-500">Found {currentState.totalResults} results</p>
             </div>
-            <div className="space-y-6">
-              {currentState.results.map((result, index) => (
-                <Card key={result.id || index} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <button 
-                        onClick={() => router.push(`/papers/${result.id}`)}
-                        className="text-lg font-semibold text-gray-900 leading-tight flex-1 mr-4 text-left hover:text-blue-600 transition-colors cursor-pointer"
-                      >
-                        {result.title}
-                      </button>
-                      <div className="flex items-center space-x-2">
-                        {(result.relevance_score || result.similarity_score) && (
-                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                            Score: {(result.relevance_score || result.similarity_score)?.toFixed(3)}
-                          </Badge>
-                        )}
-                        {result.match_score && (
-                          <Badge variant="secondary" className="bg-green-100 text-green-800">
-                            Match: {result.match_score.toFixed(0)}%
-                          </Badge>
-                        )}
-                        <Button variant="outline" size="sm" onClick={() => router.push(`/papers/${result.id}`)}>
-                          View Details
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      {result.snippet && (
-                        <p className="text-gray-600 leading-relaxed">
-                          <span className="font-medium">Abstract:</span> {result.snippet}
-                        </p>
-                      )}
-                      
-                      {result.matched_keywords && result.matched_keywords.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          <span className="text-sm font-medium text-gray-700">Matched Keywords:</span>
-                          {result.matched_keywords.map((keyword, i) => (
-                            <Badge key={i} variant="outline" className="text-xs">
-                              {keyword}
-                            </Badge>
-                          ))}
+            
+            <Accordion type="single" collapsible className="w-full space-y-2">
+              {currentState.results.map((result, index) => {
+                const [imageError, setImageError] = useState(false);
+                const [imageLoading, setImageLoading] = useState(true);
+                const thumbnailUrl = `/api/documents/${result.id}/thumbnail?width=280&height=200`;
+
+                const handleImageLoad = () => setImageLoading(false);
+                const handleImageError = () => {
+                  setImageError(true);
+                  setImageLoading(false);
+                };
+
+                return (
+                  <AccordionItem
+                    key={result.id || index}
+                    value={`item-${index}`}
+                    className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <AccordionTrigger className="px-6 py-4 hover:no-underline">
+                      <div className="flex justify-between items-start w-full mr-4">
+                        <div className="flex gap-4 flex-1 text-left">
+                          {/* Thumbnail */}
+                          <div className="flex-shrink-0 w-28 h-20 bg-gray-100 rounded overflow-hidden relative flex items-center justify-center">
+                            {!imageError && result.url ? (
+                              <>
+                                {imageLoading && (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <FileText className="w-4 h-4 text-gray-400 animate-pulse" />
+                                  </div>
+                                )}
+                                <img
+                                  src={thumbnailUrl}
+                                  alt={`Thumbnail for ${result.title}`}
+                                  className={`max-w-full max-h-full object-contain transition-opacity duration-300 border border-gray-200 ${
+                                    imageLoading ? 'opacity-0' : 'opacity-100'
+                                  }`}
+                                  onLoad={handleImageLoad}
+                                  onError={handleImageError}
+                                />
+                              </>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center border border-gray-200">
+                                <FileText className="w-4 h-4 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 space-y-2">
+                            <h3 className="text-lg font-semibold text-gray-900 leading-tight">
+                              {result.title}
+                            </h3>
+                            <div className="flex flex-wrap gap-2 text-sm text-gray-500">
+                              <span>{result.authors.join(', ')}</span>
+                              {result.journal_name && (
+                                <>
+                                  <span>•</span>
+                                  <span>{result.journal_name}</span>
+                                </>
+                              )}
+                              {result.publication_year && (
+                                <>
+                                  <span>•</span>
+                                  <span>{result.publication_year}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      )}
-                      
-                      <div className="flex flex-wrap gap-2 text-sm text-gray-500">
-                        <span>
-                          <span className="font-medium">Authors:</span> {result.authors.join(', ')}
-                        </span>
-                        {result.journal_name && (
-                          <>
-                            <span>|</span>
-                            <span>
-                              <span className="font-medium">Journal:</span> {result.journal_name}
-                            </span>
-                          </>
-                        )}
-                        {result.publication_year && (
-                          <>
-                            <span>|</span>
-                            <span>
-                              <span className="font-medium">Year:</span> {result.publication_year}
-                            </span>
-                          </>
-                        )}
+                        
+                        <div className="flex items-center space-x-2 ml-4">
+                          {(result.relevance_score || result.similarity_score) && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                              Score: {(result.relevance_score || result.similarity_score)?.toFixed(3)}
+                            </Badge>
+                          )}
+                          {result.match_score && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800">
+                              Match: {result.match_score.toFixed(0)}%
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </AccordionTrigger>
+                    
+                    <AccordionContent className="px-6 pb-6">
+                      <div className="space-y-4 pt-2">
+                        {/* Full Abstract */}
+                        {result.snippet && (
+                          <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Abstract</h4>
+                            <p className="text-gray-600 leading-relaxed text-sm">
+                              {result.snippet}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Matched Keywords */}
+                        {result.matched_keywords && result.matched_keywords.length > 0 && (
+                          <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Matched Keywords</h4>
+                            <div className="flex flex-wrap gap-1">
+                              {result.matched_keywords.map((keyword, i) => (
+                                <Badge key={i} variant="outline" className="text-xs">
+                                  {keyword}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Additional Details */}
+                        <div className="border-t pt-4">
+                          <div className="flex justify-between items-center">
+                            <div className="text-sm text-gray-500">
+                              <span className="font-medium">Document ID:</span> {result.id}
+                            </div>
+                            <Button 
+                              onClick={() => router.push(`/papers/${result.id}`)}
+                              className="bg-blue-600 hover:bg-blue-700"
+                              size="sm"
+                            >
+                              <ExternalLink className="w-4 h-4 mr-2" />
+                              View Full Paper
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
 
             {/* Pagination - simplified for now */}
             {currentState.results.length > 0 && (

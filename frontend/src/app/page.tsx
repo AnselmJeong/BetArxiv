@@ -10,21 +10,28 @@ import { DocumentCard } from "@/components/DocumentCard"
 import { useRecentDocuments } from "@/hooks/useDocuments"
 import { useStatistics } from "@/hooks/useFolders"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("")
+  const router = useRouter()
   const { documents: recentDocuments, loading: documentsLoading } = useRecentDocuments(3)
   const { folderCount, totalDocuments, loading: statsLoading } = useStatistics()
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement search functionality
-    console.log("Searching for:", searchQuery)
+    if (!searchQuery.trim()) return
+    
+    // Navigate to search page with semantic search
+    const searchParams = new URLSearchParams({
+      tab: 'semantic',
+      query: searchQuery.trim()
+    })
+    router.push(`/search?${searchParams.toString()}`)
   }
 
   const handleDocumentClick = (documentId: string) => {
-    // TODO: Navigate to document detail page
-    console.log("Viewing document:", documentId)
+    router.push(`/papers/${documentId}`)
   }
 
   return (
@@ -34,21 +41,27 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* My Archive Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">My Archive</h1>
-          <p className="text-gray-600 mb-6">Welcome back, Sarah! Here's a summary of your paper collection.</p>
-          
-          <form onSubmit={handleSearch} className="relative mb-8">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <Input
-              type="search"
-              placeholder="Search your archive"
-              className="pl-12 pr-4 py-3 w-full max-w-2xl bg-white border border-gray-200 rounded-lg text-lg"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </form>
+        {/* Hero Section */}
+        <div className="mb-12">
+          <Card className="bg-gradient-to-r from-blue-50 to-indigo-100 border-0 overflow-hidden">
+            <CardContent className="p-8">
+              <div className="max-w-3xl mx-auto text-center">
+                <h1 className="text-4xl font-bold text-gray-900 mb-4">My Archive</h1>
+                <p className="text-lg text-gray-600 mb-8">Welcome back! Wield the power of AI to understand your papers.</p>
+                
+                <form onSubmit={handleSearch} className="relative max-w-2xl mx-auto">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                  <Input
+                    type="search"
+                    placeholder="Search your archive with AI-powered semantic search..."
+                    className="pl-12 pr-4 py-4 w-full bg-white border border-gray-200 rounded-xl text-lg shadow-sm focus:shadow-md transition-shadow"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </form>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Recent Additions */}
@@ -87,7 +100,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* Explore Your Folders Section */}
+        {/* Explore Your Folders Section
         <div className="mb-12">
           <Card className="bg-gradient-to-r from-gray-100 to-orange-100 border-0 overflow-hidden">
             <div className="relative h-48">
@@ -106,7 +119,7 @@ export default function Home() {
               </CardContent>
             </div>
           </Card>
-        </div>
+        </div> */}
 
         {/* Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

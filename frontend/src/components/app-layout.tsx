@@ -16,7 +16,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         isCollapsed={isSidebarCollapsed} 
         onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
       />
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-auto">
         {children}
       </div>
     </div>

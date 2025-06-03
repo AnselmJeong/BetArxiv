@@ -108,6 +108,7 @@ class SearchResult(BaseModel):
     keywords: Optional[List[str]] = None
     similarity_score: float
     snippet: Optional[str] = None
+    url: Optional[str] = None
 
 
 class SearchResponse(BaseModel):
@@ -257,6 +258,7 @@ class KeywordSearchResult(BaseModel):
     abstract: Optional[str] = None
     journal_name: Optional[str] = None
     publication_year: Optional[int] = None
+    url: Optional[str] = None
 
 
 class KeywordSearchResponse(BaseModel):

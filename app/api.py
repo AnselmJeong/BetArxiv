@@ -8,9 +8,11 @@ from fastapi import (
     Body,
     Path as FastAPIPath,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from typing import Optional, Dict, Any, List
 from uuid import UUID
+import io
+from PIL import Image
 
 from .models import (
     Document,
@@ -149,6 +151,7 @@ def get_router(db: Database):
                     keywords=result.get("keywords"),
                     similarity_score=result["similarity_score"],
                     snippet=result.get("snippet"),
+                    url=result.get("url"),
                 )
             )
 
@@ -294,20 +297,89 @@ def get_router(db: Database):
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
 
-        # Get the chat response
-        answer = await db.chat_with_document(document, chat_request.message)
+        # Generate chat response
+        try:
+            response_text = await db.chat_with_document(document, chat_request.message)
 
-        # Create chat message
-        from datetime import datetime
-        import uuid
+            # Create chat message for response
+            from datetime import datetime
+            import uuid
 
-        chat_message = ChatMessage(
-            id=str(uuid.uuid4()),
-            content=chat_request.message,
-            role="user",
-            timestamp=datetime.now().isoformat(),
-        )
+            chat_message = ChatMessage(
+                id=str(uuid.uuid4()),
+                role="assistant",
+                content=response_text,
+                timestamp=datetime.now().isoformat(),
+            )
 
-        return ChatResponse(message=chat_message, answer=answer)
+            return ChatResponse(message=chat_message, answer=response_text)
+        except Exception as e:
+            logger.error(f"Chat error for document {document_id}: {e}")
+            raise HTTPException(
+                status_code=500, detail="Failed to generate chat response"
+            )
+
+    @router.get("/documents/{document_id}/thumbnail")
+    async def get_document_thumbnail(
+        document_id: UUID = FastAPIPath(...),
+        width: int = Query(300, ge=100, le=800, description="Thumbnail width"),
+        height: int = Query(200, ge=100, le=600, description="Thumbnail height"),
+    ):
+        """Generate and serve a thumbnail image from the first page of the document's PDF"""
+        try:
+            # Get the document to find the PDF path
+            document = await db.get_document(document_id)
+            if not document:
+                raise HTTPException(status_code=404, detail="Document not found")
+
+            if not document.url:
+                raise HTTPException(status_code=404, detail="Document has no PDF file")
+
+            # Construct the PDF path
+            # Assuming document.url contains the relative path from the docs directory
+            base_directory = Path(os.getenv("DOCS_BASE_DIR", "docs")).resolve()
+            pdf_path = (base_directory / document.url).resolve()
+
+            # Security check: ensure the resolved path is still within base directory
+            try:
+                pdf_path.relative_to(base_directory)
+            except ValueError:
+                logger.error(
+                    f"Security violation: PDF path outside base directory: {pdf_path}"
+                )
+                raise HTTPException(status_code=403, detail="Access denied")
+
+            # Check if PDF file exists
+            if not pdf_path.exists():
+                logger.error(f"PDF file not found: {pdf_path}")
+                raise HTTPException(status_code=404, detail="PDF file not found")
+
+            if not pdf_path.is_file():
+                raise HTTPException(status_code=400, detail="Path is not a file")
+
+            if pdf_path.suffix.lower() != ".pdf":
+                raise HTTPException(status_code=400, detail="File is not a PDF")
+
+            # Generate thumbnail
+            from .utils import generate_pdf_thumbnail
+
+            thumbnail_buffer = generate_pdf_thumbnail(pdf_path, width, height)
+
+            # Return the thumbnail as a streaming response
+            return StreamingResponse(
+                io.BytesIO(thumbnail_buffer.getvalue()),
+                media_type="image/jpeg",
+                headers={
+                    "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+                    "Content-Disposition": f"inline; filename=thumbnail_{document_id}.jpg",
+                },
+            )
+
+        except HTTPException:
+            # Re-raise HTTP exceptions as is
+            raise
+        except Exception as e:
+            logger.error(f"Error generating thumbnail for document {document_id}: {e}")
+            raise HTTPException(status_code=500, detail="Failed to generate thumbnail")
 
     return router

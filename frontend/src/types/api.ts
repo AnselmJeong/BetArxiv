@@ -68,6 +68,7 @@ export interface SearchResult {
   keywords?: string[];
   matched_keywords?: string[];
   folder_name?: string;
+  url?: string;
 }
 
 export interface SearchResponse {
