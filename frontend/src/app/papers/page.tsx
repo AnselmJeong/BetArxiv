@@ -222,23 +222,7 @@ export default function PapersPage() {
   };
 
   const handlePaperClick = (paperId: string) => {
-    // Build URL with current filter and sort state
-    const params = new URLSearchParams();
-    
-    if (searchQuery) params.set('search', searchQuery);
-    if (selectedFolder !== 'all-folders') params.set('folder', selectedFolder);
-    if (selectedYear !== 'all-years') params.set('year', selectedYear);
-    if (selectedJournal !== 'all-journals') params.set('journal', selectedJournal);
-    if (selectedKeywords !== 'all-keywords') params.set('keywords', selectedKeywords);
-    
-    params.set('sortField', sortField);
-    params.set('sortOrder', sortOrder);
-    params.set('page', currentPage.toString());
-    
-    const queryString = params.toString();
-    const url = `/papers/${paperId}${queryString ? `?${queryString}` : ''}`;
-    
-    router.push(url);
+    router.push(`/papers/${paperId}`);
   };
 
   // Generate external link based on DOI or ArXiv ID
