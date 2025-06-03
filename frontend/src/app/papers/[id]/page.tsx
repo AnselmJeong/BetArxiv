@@ -308,9 +308,10 @@ export default function PaperDetailPage() {
           <CardContent>
             <div className="space-y-2">
               {paper.authors && paper.authors.length > 0 ? (
-                paper.authors.map((author, index) => (
-                  <p key={index} className="text-gray-900">{author}</p>
-                ))
+                <p className="text-gray-900">
+                  {paper.authors.slice(0, 3).join(', ')}
+                  {paper.authors.length > 3 && ', ...'}
+                </p>
               ) : (
                 <p className="text-gray-500">Unknown authors</p>
               )}
