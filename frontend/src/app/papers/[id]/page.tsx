@@ -258,9 +258,9 @@ export default function PaperDetailPage() {
         </Button>
         {getExternalLink() && (
           <Button variant="outline" asChild>
-            <a href={getExternalLink().url} target="_blank" rel="noopener noreferrer">
+            <a href={getExternalLink()!.url} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="w-4 h-4 mr-2" />
-              {getExternalLink().label}
+              {getExternalLink()!.label}
             </a>
           </Button>
         )}
@@ -275,25 +275,12 @@ export default function PaperDetailPage() {
               Publication Details
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             <div>
-              <label className="text-sm font-medium text-gray-500">Journal</label>
-              <p className="text-gray-900">{paper.journal_name || 'Unknown'}</p>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-500">Year</label>
-                <p className="text-gray-900">{paper.publication_year || 'Unknown'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">Volume</label>
-                <p className="text-gray-900">{paper.volume || 'Unknown'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">Issue</label>
-                <p className="text-gray-900">{paper.issue || 'Unknown'}</p>
-              </div>
+              <p className="text-gray-900">
+                {paper.publication_year ? paper.publication_year : 'Unknown'}
+                {paper.journal_name ? `, ${paper.journal_name}` : ''}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -320,12 +307,25 @@ export default function PaperDetailPage() {
         </Card>
       </div>
 
+
+      {/* Abstract */}
+      {paper.abstract && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Abstract</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 leading-relaxed">{paper.abstract}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Keywords */}
       {paper.keywords && paper.keywords.length > 0 && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Hash className="w-5 h-5" />
+              {/* <Hash className="w-5 h-5" /> */}
               Keywords
             </CardTitle>
           </CardHeader>
@@ -339,17 +339,6 @@ export default function PaperDetailPage() {
         </Card>
       )}
 
-      {/* Abstract */}
-      {paper.abstract && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Abstract</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-700 leading-relaxed">{paper.abstract}</p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 } 
