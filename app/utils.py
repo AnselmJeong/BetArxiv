@@ -2,7 +2,6 @@ import numpy as np
 import os
 import logging
 import asyncio
-from typing import List, Optional
 from pathlib import Path
 import io
 from PIL import Image
@@ -28,7 +27,7 @@ def get_genai_client():
     return genai
 
 
-async def get_embedding(text: str, client) -> List[float]:
+async def get_embedding(text: str, client) -> list[float]:
     """Generate embedding for text using Google's embedding model"""
     try:
         # Use the embedding model
@@ -47,7 +46,7 @@ async def get_embedding(text: str, client) -> List[float]:
 
 async def chat_with_document_content(
     title: str,
-    authors: List[str],
+    authors: list[str],
     markdown_content: str,
     user_message: str,
     genai_client,

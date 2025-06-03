@@ -1,9 +1,8 @@
 import logging
 from typing import List, Optional, Any, Dict
 from uuid import UUID
-from datetime import datetime
+
 import os
-from pathlib import Path
 import json
 
 import psycopg
@@ -16,12 +15,10 @@ from .models import (
     DocumentMetadata,
     DocumentSummary,
     DocumentEmbedding,
-    SearchResult,
     FolderInfo,
     UpdateSummaryRequest,
     UpdateMetadataRequest,
     DocumentListResponse,
-    SearchResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -624,32 +621,32 @@ class Database:
             if exact_match:
                 if case_sensitive:
                     keyword_match = (
-                        f"(SELECT COUNT(*) FROM unnest(keywords) k WHERE k = %s)"
+                        "(SELECT COUNT(*) FROM unnest(keywords) k WHERE k = %s)"
                     )
-                    title_match = f"(CASE WHEN title = %s THEN 1 ELSE 0 END)"
-                    abstract_match = f"(CASE WHEN abstract = %s THEN 1 ELSE 0 END)"
+                    title_match = "(CASE WHEN title = %s THEN 1 ELSE 0 END)"
+                    abstract_match = "(CASE WHEN abstract = %s THEN 1 ELSE 0 END)"
                 else:
-                    keyword_match = f"(SELECT COUNT(*) FROM unnest(keywords) k WHERE LOWER(k) = LOWER(%s))"
+                    keyword_match = "(SELECT COUNT(*) FROM unnest(keywords) k WHERE LOWER(k) = LOWER(%s))"
                     title_match = (
-                        f"(CASE WHEN LOWER(title) = LOWER(%s) THEN 1 ELSE 0 END)"
+                        "(CASE WHEN LOWER(title) = LOWER(%s) THEN 1 ELSE 0 END)"
                     )
                     abstract_match = (
-                        f"(CASE WHEN LOWER(abstract) = LOWER(%s) THEN 1 ELSE 0 END)"
+                        "(CASE WHEN LOWER(abstract) = LOWER(%s) THEN 1 ELSE 0 END)"
                     )
             else:
                 if case_sensitive:
                     keyword_match = (
-                        f"(SELECT COUNT(*) FROM unnest(keywords) k WHERE k LIKE %s)"
+                        "(SELECT COUNT(*) FROM unnest(keywords) k WHERE k LIKE %s)"
                     )
-                    title_match = f"(CASE WHEN title LIKE %s THEN 1 ELSE 0 END)"
-                    abstract_match = f"(CASE WHEN abstract LIKE %s THEN 1 ELSE 0 END)"
+                    title_match = "(CASE WHEN title LIKE %s THEN 1 ELSE 0 END)"
+                    abstract_match = "(CASE WHEN abstract LIKE %s THEN 1 ELSE 0 END)"
                 else:
-                    keyword_match = f"(SELECT COUNT(*) FROM unnest(keywords) k WHERE LOWER(k) LIKE LOWER(%s))"
+                    keyword_match = "(SELECT COUNT(*) FROM unnest(keywords) k WHERE LOWER(k) LIKE LOWER(%s))"
                     title_match = (
-                        f"(CASE WHEN LOWER(title) LIKE LOWER(%s) THEN 1 ELSE 0 END)"
+                        "(CASE WHEN LOWER(title) LIKE LOWER(%s) THEN 1 ELSE 0 END)"
                     )
                     abstract_match = (
-                        f"(CASE WHEN LOWER(abstract) LIKE LOWER(%s) THEN 1 ELSE 0 END)"
+                        "(CASE WHEN LOWER(abstract) LIKE LOWER(%s) THEN 1 ELSE 0 END)"
                     )
 
             # Build relevance score calculation (uses 3 parameters)
