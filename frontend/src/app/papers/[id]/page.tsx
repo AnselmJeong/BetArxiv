@@ -5,8 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ExternalLink, Eye, Calendar, Users, BookOpen, Hash } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Eye, Calendar, Users, BookOpen, Hash, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Document } from '@/types/api';
+import { useNavigation } from '@/contexts/navigation-context';
 
 export default function PaperDetailPage() {
   const { id } = useParams();
@@ -14,6 +15,14 @@ export default function PaperDetailPage() {
   const [paper, setPaper] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const { 
+    navigationState, 
+    navigateToDocument, 
+    getPreviousDocument, 
+    getNextDocument,
+    findDocumentIndex 
+  } = useNavigation();
 
   useEffect(() => {
     const fetchPaper = async () => {
@@ -28,6 +37,11 @@ export default function PaperDetailPage() {
         
         const data: Document = await response.json();
         setPaper(data);
+        
+        // Update navigation state if this document is in the set
+        if (typeof id === 'string' && navigationState) {
+          navigateToDocument(id);
+        }
       } catch (err) {
         console.error('Error fetching paper:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch paper');
@@ -39,7 +53,78 @@ export default function PaperDetailPage() {
     if (id) {
       fetchPaper();
     }
-  }, [id]);
+  }, [id, navigationState, navigateToDocument]);
+
+  // Navigation helpers
+  const previousDocument = getPreviousDocument();
+  const nextDocument = getNextDocument();
+  const currentIndex = typeof id === 'string' ? findDocumentIndex(id) : -1;
+  const totalCount = navigationState?.documents?.length || 0;
+
+  const handlePreviousClick = () => {
+    if (previousDocument) {
+      router.push(`/papers/${previousDocument.id}`);
+    }
+  };
+
+  const handleNextClick = () => {
+    if (nextDocument) {
+      router.push(`/papers/${nextDocument.id}`);
+    }
+  };
+
+  const handleBackToPapers = () => {
+    // If we have navigation state with filters, preserve them in the URL
+    if (navigationState?.filters) {
+      const params = new URLSearchParams();
+      Object.entries(navigationState.filters).forEach(([key, value]) => {
+        if (value) {
+          params.set(key, value);
+        }
+      });
+      const query = params.toString();
+      router.push(`/papers${query ? `?${query}` : ''}`);
+    } else {
+      router.push('/papers');
+    }
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle navigation if we have a navigation set
+      if (!navigationState) return;
+      
+      // Don't interfere if user is typing in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
+      switch (e.key) {
+        case 'ArrowLeft':
+        case 'h': // Vim-style navigation
+          e.preventDefault();
+          if (previousDocument) {
+            router.push(`/papers/${previousDocument.id}`);
+          }
+          break;
+        case 'ArrowRight':
+        case 'l': // Vim-style navigation
+          e.preventDefault();
+          if (nextDocument) {
+            router.push(`/papers/${nextDocument.id}`);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          handleBackToPapers();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previousDocument, nextDocument, navigationState, router, handleBackToPapers]);
 
   // Generate external link based on DOI or ArXiv ID
   const getExternalLink = (): { url: string; label: string } | null => {
@@ -86,16 +171,70 @@ export default function PaperDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Header */}
+      {/* Header with Navigation */}
       <div className="mb-6">
-        <Button 
-          variant="ghost" 
-          onClick={() => router.back()}
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Papers
-        </Button>
+        <div className="flex items-center justify-between mb-4">
+          <Button 
+            variant="ghost" 
+            onClick={handleBackToPapers}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Papers
+          </Button>
+          
+          {/* Navigation Controls */}
+          {navigationState && totalCount > 0 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreviousClick}
+                disabled={!previousDocument}
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Previous
+              </Button>
+              
+              <span className="text-sm text-gray-600 px-3">
+                {currentIndex >= 0 ? currentIndex + 1 : '?'} of {totalCount}
+              </span>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextClick}
+                disabled={!nextDocument}
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          )}
+        </div>
+        
+        {/* Show current filters if available */}
+        {navigationState?.filters && Object.values(navigationState.filters).some(Boolean) && (
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 mb-2">Browsing filtered results:</p>
+            <div className="flex flex-wrap gap-2">
+              {navigationState.filters.searchQuery && (
+                <Badge variant="secondary">Search: "{navigationState.filters.searchQuery}"</Badge>
+              )}
+              {navigationState.filters.selectedFolder && (
+                <Badge variant="secondary">Folder: {navigationState.filters.selectedFolder}</Badge>
+              )}
+              {navigationState.filters.selectedYear && (
+                <Badge variant="secondary">Year: {navigationState.filters.selectedYear}</Badge>
+              )}
+              {navigationState.filters.selectedJournal && (
+                <Badge variant="secondary">Journal: {navigationState.filters.selectedJournal}</Badge>
+              )}
+              {navigationState.filters.selectedKeywords && (
+                <Badge variant="secondary">Keywords: {navigationState.filters.selectedKeywords}</Badge>
+              )}
+            </div>
+          </div>
+        )}
         
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           {paper.title}

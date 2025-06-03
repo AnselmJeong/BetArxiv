@@ -8,10 +8,11 @@ import PDFViewer from '@/components/PDFViewer';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import ChatBox from '@/components/ChatBox';
 import { usePdfPath } from '@/hooks/usePdfPath';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Document } from '@/types/api';
 import { Allotment } from 'allotment';
 import 'allotment/dist/style.css';
+import { ArrowLeft } from 'lucide-react';
 
 interface PageProps {
   params: { id: string };
@@ -19,6 +20,7 @@ interface PageProps {
 
 export default function PaperInspectPage({ params }: PageProps) {
   const { id: documentId } = useParams();
+  const router = useRouter();
   const { getPdfUrl } = usePdfPath();
   const [document, setDocument] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,10 +56,18 @@ export default function PaperInspectPage({ params }: PageProps) {
   // Construct the PDF URL using the document's actual file path
   const pdfUrl = document?.url ? getPdfUrl(documentId as string, document.url) : null;
 
+  const handleBackToOverview = () => {
+    router.push(`/papers/${documentId}`);
+  };
+
   if (loading) {
     return (
       <div className="h-full bg-muted/50 flex flex-col">
         <div className="py-6 px-4 flex-1 flex flex-col min-h-0">
+          <Button variant="ghost" onClick={handleBackToOverview} className="mb-4 w-fit">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Overview
+          </Button>
           <div className="text-sm text-muted-foreground mb-4">
             <span className="mr-2">Papers</span>/ <span className="ml-2">Loading...</span>
           </div>
@@ -95,6 +105,10 @@ export default function PaperInspectPage({ params }: PageProps) {
     return (
       <div className="h-full bg-muted/50 flex flex-col">
         <div className="py-6 px-4 flex-1 flex flex-col min-h-0">
+          <Button variant="ghost" onClick={handleBackToOverview} className="mb-4 w-fit">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Overview
+          </Button>
           <div className="text-sm text-muted-foreground mb-4">
             <span className="mr-2">Papers</span>/ <span className="ml-2">Error</span>
           </div>
@@ -114,6 +128,10 @@ export default function PaperInspectPage({ params }: PageProps) {
   return (
     <div className="h-full bg-muted/50 flex flex-col">
       <div className="py-6 px-4 flex-1 flex flex-col min-h-0">
+        <Button variant="ghost" onClick={handleBackToOverview} className="mb-4 w-fit">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Overview
+        </Button>
         <div className="text-sm text-muted-foreground mb-4">
           <span className="mr-2">Papers</span>/ <span className="ml-2">{document.title}</span>
         </div>

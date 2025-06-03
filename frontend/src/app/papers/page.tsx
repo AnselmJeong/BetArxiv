@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, Loader2, ExternalLink, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Document, DocumentsResponse } from '@/types/api';
+import { useNavigation } from '@/contexts/navigation-context';
 
 interface FolderInfo {
   name: string;
@@ -37,15 +38,18 @@ type SortOrder = 'asc' | 'desc';
 
 export default function PapersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [papers, setPapers] = useState<Document[]>([]);
   const [totalDocuments, setTotalDocuments] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFolder, setSelectedFolder] = useState<string>('all-folders');
-  const [selectedYear, setSelectedYear] = useState<string>('all-years');
-  const [selectedJournal, setSelectedJournal] = useState<string>('all-journals');
-  const [selectedKeywords, setSelectedKeywords] = useState<string>('all-keywords');
+  
+  // Initialize state from URL parameters
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('searchQuery') || '');
+  const [selectedFolder, setSelectedFolder] = useState<string>(searchParams.get('selectedFolder') || 'all-folders');
+  const [selectedYear, setSelectedYear] = useState<string>(searchParams.get('selectedYear') || 'all-years');
+  const [selectedJournal, setSelectedJournal] = useState<string>(searchParams.get('selectedJournal') || 'all-journals');
+  const [selectedKeywords, setSelectedKeywords] = useState<string>(searchParams.get('selectedKeywords') || 'all-keywords');
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,6 +59,32 @@ export default function PapersPage() {
   // Sorting state
   const [sortField, setSortField] = useState<SortField>('year');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  const { setNavigationSet } = useNavigation();
+
+  // Update URL when filters change
+  const updateURL = (newFilters: {
+    searchQuery?: string;
+    selectedFolder?: string;
+    selectedYear?: string;
+    selectedJournal?: string;
+    selectedKeywords?: string;
+  }) => {
+    const params = new URLSearchParams();
+    
+    // Only add non-default values to URL
+    Object.entries(newFilters).forEach(([key, value]) => {
+      if (value && !value.startsWith('all-')) {
+        params.set(key, value);
+      }
+    });
+    
+    const query = params.toString();
+    const newURL = `/papers${query ? `?${query}` : ''}`;
+    
+    // Use replace instead of push to avoid cluttering browser history
+    router.replace(newURL);
+  };
 
   // Fetch folders from API
   useEffect(() => {
@@ -152,6 +182,57 @@ export default function PapersPage() {
   const handleFolderChange = (value: string) => {
     setSelectedFolder(value);
     setCurrentPage(1);
+    updateURL({
+      searchQuery,
+      selectedFolder: value,
+      selectedYear,
+      selectedJournal,
+      selectedKeywords,
+    });
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    updateURL({
+      searchQuery: value,
+      selectedFolder,
+      selectedYear,
+      selectedJournal,
+      selectedKeywords,
+    });
+  };
+
+  const handleYearChange = (value: string) => {
+    setSelectedYear(value);
+    updateURL({
+      searchQuery,
+      selectedFolder,
+      selectedYear: value,
+      selectedJournal,
+      selectedKeywords,
+    });
+  };
+
+  const handleJournalChange = (value: string) => {
+    setSelectedJournal(value);
+    updateURL({
+      searchQuery,
+      selectedFolder,
+      selectedYear,
+      selectedJournal: value,
+      selectedKeywords,
+    });
+  };
+
+  const handleKeywordsChange = (value: string) => {
+    setSelectedKeywords(value);
+    updateURL({
+      searchQuery,
+      selectedFolder,
+      selectedYear,
+      selectedJournal,
+      selectedKeywords: value,
+    });
   };
 
   const handlePageChange = (page: number) => {
@@ -222,6 +303,16 @@ export default function PapersPage() {
   };
 
   const handlePaperClick = (paperId: string) => {
+    // Set the navigation set with current filtered and sorted papers
+    const currentFilters = {
+      searchQuery,
+      selectedFolder: selectedFolder !== 'all-folders' ? selectedFolder : undefined,
+      selectedYear: selectedYear !== 'all-years' ? selectedYear : undefined,
+      selectedJournal: selectedJournal !== 'all-journals' ? selectedJournal : undefined,
+      selectedKeywords: selectedKeywords !== 'all-keywords' ? selectedKeywords : undefined,
+    };
+    
+    setNavigationSet(sortedPapers, currentFilters);
     router.push(`/papers/${paperId}`);
   };
 
@@ -300,7 +391,7 @@ export default function PapersPage() {
           <Input
             placeholder="Search papers, authors, journals..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
           />
         </div>
@@ -320,7 +411,7 @@ export default function PapersPage() {
           </SelectContent>
         </Select>
 
-        <Select value={selectedYear} onValueChange={setSelectedYear}>
+        <Select value={selectedYear} onValueChange={handleYearChange}>
           <SelectTrigger className="w-32">
             <SelectValue placeholder="Year" />
           </SelectTrigger>
@@ -332,19 +423,19 @@ export default function PapersPage() {
           </SelectContent>
         </Select>
 
-        <Select value={selectedJournal} onValueChange={setSelectedJournal}>
+        <Select value={selectedJournal} onValueChange={handleJournalChange}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Journal" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all-journals">All Journals</SelectItem>
-            {journals.map(journal => (
-              <SelectItem key={journal} value={journal}>{journal}</SelectItem>
+            {journals.filter(journal => journal).map(journal => (
+              <SelectItem key={journal!} value={journal!}>{journal}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        <Select value={selectedKeywords} onValueChange={setSelectedKeywords}>
+        <Select value={selectedKeywords} onValueChange={handleKeywordsChange}>
           <SelectTrigger className="w-32">
             <SelectValue placeholder="Keywords" />
           </SelectTrigger>
