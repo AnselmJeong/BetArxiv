@@ -30,6 +30,7 @@ from .models import (
     ChatRequest,
     ChatResponse,
     ChatMessage,
+    UpdateRatingRequest,
 )
 from .db import Database
 
@@ -316,6 +317,28 @@ def get_router(db: Database):
         if not success:
             raise HTTPException(status_code=404, detail="Document not found")
         return await db.get_document_metadata(document_id)
+
+    @router.patch("/documents/{document_id}/rating")
+    async def update_document_rating(
+        document_id: UUID = FastAPIPath(...),
+        rating_data: UpdateRatingRequest = Body(...),
+    ):
+        """Update the rating for a document"""
+        from .models import UpdateRatingRequest
+
+        success = await db.update_document_rating(document_id, rating_data)
+        if not success:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Return the updated document metadata with the new rating
+        updated_metadata = await db.get_document_metadata(document_id)
+        if not updated_metadata:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        return {
+            "rating": updated_metadata.rating,
+            "message": "Rating updated successfully",
+        }
 
     @router.get(
         "/documents/{document_id}/similar", response_model=SimilarDocumentsResponse

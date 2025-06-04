@@ -15,6 +15,9 @@ class DocumentBase(BaseModel):
     url: Optional[str] = None  # filepath in storage
     doi: Optional[str] = None  # DOI identifier
     arxiv_id: Optional[str] = None  # arXiv identifier
+    rating: Optional[int] = Field(
+        None, ge=1, le=5, description="User rating from 1 to 5"
+    )
 
 
 class DocumentCreate(DocumentBase):
@@ -50,6 +53,7 @@ class DocumentMetadata(BaseModel):
     doi: Optional[str] = None
     arxiv_id: Optional[str] = None
     markdown: Optional[str] = None
+    rating: Optional[int] = None
 
 
 class DocumentSummary(BaseModel):
@@ -82,6 +86,7 @@ class DocumentListItem(BaseModel):
     issue: Optional[str]
     url: Optional[str]
     keywords: Optional[List[str]]
+    rating: Optional[int] = None
 
 
 class DocumentListResponse(BaseModel):
@@ -169,6 +174,11 @@ class UpdateMetadataRequest(BaseModel):
     doi: Optional[str] = None
     arxiv_id: Optional[str] = None
     markdown: Optional[str] = None
+    rating: Optional[int] = Field(None, ge=1, le=5)
+
+
+class UpdateRatingRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5, description="User rating from 1 to 5")
 
 
 class StatusResponse(BaseModel):

@@ -15,6 +15,7 @@ export interface Document {
   url?: string;
   doi?: string;
   arxiv_id?: string;
+  rating?: number;
   // Summary fields
   summary?: string;
   previous_work?: string;

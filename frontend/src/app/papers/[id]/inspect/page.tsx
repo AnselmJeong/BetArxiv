@@ -12,7 +12,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Document } from '@/types/api';
 import { Allotment } from 'allotment';
 import 'allotment/dist/style.css';
-import { ArrowLeft, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2, Star } from 'lucide-react';
 
 interface PageProps {
   params: { id: string };
@@ -27,6 +27,8 @@ export default function PaperInspectPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [isUpdatingRating, setIsUpdatingRating] = useState(false);
+  const [ratingError, setRatingError] = useState<string | null>(null);
   
   // Fetch document data to get the actual file path
   useEffect(() => {
@@ -104,6 +106,40 @@ export default function PaperInspectPage({ params }: PageProps) {
     }
   };
 
+  const handleRatingUpdate = async (rating: number) => {
+    if (!documentId || !document) return;
+    
+    try {
+      setIsUpdatingRating(true);
+      setRatingError(null);
+      
+      const response = await fetch(`/api/documents/${documentId}/rating`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rating }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Failed to update rating: ${response.status}`);
+      }
+      
+      // Update the document state with the new rating
+      setDocument(prev => prev ? {
+        ...prev,
+        rating: rating,
+      } : null);
+      
+    } catch (err) {
+      console.error('Error updating rating:', err);
+      setRatingError(err instanceof Error ? err.message : 'Failed to update rating');
+    } finally {
+      setIsUpdatingRating(false);
+    }
+  };
+
   const hasSummaryContent = document && (
     document.summary || 
     document.previous_work || 
@@ -114,6 +150,46 @@ export default function PaperInspectPage({ params }: PageProps) {
     document.limitations || 
     document.implications
   );
+
+  const RatingComponent = () => {
+    if (!document) return null;
+    
+    return (
+      <div className="flex flex-col gap-1 mb-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">Your Rating:</span>
+          {ratingError && (
+            <span className="text-xs text-red-500">Error updating rating</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              onClick={() => !isUpdatingRating && handleRatingUpdate(star)}
+              disabled={isUpdatingRating}
+              className={`w-4 h-4 transition-colors ${
+                isUpdatingRating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-110'
+              }`}
+            >
+              <Star
+                className={`w-4 h-4 ${
+                  document.rating && star <= document.rating
+                    ? 'fill-yellow-400 text-yellow-400'
+                    : 'text-gray-300 hover:text-yellow-400'
+                }`}
+              />
+            </button>
+          ))}
+          {document.rating && (
+            <span className="text-xs text-muted-foreground ml-2">
+              {document.rating}/5
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -214,6 +290,7 @@ export default function PaperInspectPage({ params }: PageProps) {
                   {/* Summary Section */}
                   <Allotment.Pane>
                     <Card className="h-full p-4 flex flex-col min-h-0 overflow-hidden mb-2">
+                      <RatingComponent />
                       <div className="flex items-center justify-between mb-3 flex-shrink-0">
                         <div className="flex-1">
                           <Tabs defaultValue="summary" className="w-full h-full flex flex-col min-h-0 overflow-hidden">

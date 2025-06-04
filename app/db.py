@@ -19,6 +19,7 @@ from .models import (
     UpdateSummaryRequest,
     UpdateMetadataRequest,
     DocumentListResponse,
+    UpdateRatingRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -124,7 +125,7 @@ class Database:
         """Get document metadata by ID."""
         query = """
             SELECT title, authors, journal_name, publication_year,
-                   abstract, keywords, volume, issue, url, doi, arxiv_id, markdown
+                   abstract, keywords, volume, issue, url, doi, arxiv_id, markdown, rating
             FROM documents
             WHERE id = %s
         """
@@ -220,6 +221,17 @@ class Database:
             await cur.execute(query, values)
             return cur.rowcount > 0
 
+    async def update_document_rating(
+        self, document_id: UUID, rating_data: UpdateRatingRequest
+    ) -> bool:
+        """Update the rating for a specific document."""
+        query = "UPDATE documents SET rating=%s, updated_at=NOW() WHERE id=%s"
+        values = [rating_data.rating, str(document_id)]
+
+        async with self.pool.cursor() as cur:
+            await cur.execute(query, values)
+            return cur.rowcount > 0
+
     async def list_documents(
         self,
         skip: int = 0,
@@ -254,7 +266,7 @@ class Database:
         count_query = f"SELECT COUNT(*) FROM documents {where_clause}"
         query = f"""
             SELECT id, title, authors, journal_name, publication_year,
-                   volume, issue, url, abstract, keywords, folder_name, doi, arxiv_id
+                   volume, issue, url, abstract, keywords, folder_name, doi, arxiv_id, rating
             FROM documents
             {where_clause}
             ORDER BY created_at DESC, title

@@ -533,6 +533,7 @@ async def process_pdf(
         status="processed",
         folder_name=folder_name,
         url=relative_pdf_path,
+        rating=None,  # Rating will be set by users via inspect page
     )
 
 
