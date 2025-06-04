@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS documents (
     publication_year INTEGER,
     abstract TEXT,
     keywords TEXT[],
+    rating INTEGER,
+
     
     -- Document identifiers
     doi TEXT,  -- DOI identifier for published papers

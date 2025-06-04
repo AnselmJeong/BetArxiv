@@ -247,6 +247,66 @@ def get_router(db: Database):
             raise HTTPException(status_code=404, detail="Document not found")
         return await db.get_document_summary(document_id)
 
+    @router.post(
+        "/documents/{document_id}/generate-summary", response_model=DocumentSummary
+    )
+    async def generate_document_summary(
+        document_id: UUID = FastAPIPath(...),
+    ):
+        """Generate summary for a document using its markdown content"""
+        try:
+            # Get the document to access its markdown content
+            document = await db.get_document(document_id)
+            if not document:
+                raise HTTPException(status_code=404, detail="Document not found")
+
+            if not document.markdown:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Document has no markdown content to generate summary from",
+                )
+
+            # Import the summary generation function
+            from .utils import generate_summary, get_genai_client
+
+            # Generate summary using the document's markdown content
+            genai_client = get_genai_client()
+            summary_data = await generate_summary(document.markdown, genai_client)
+
+            # Convert the summary data to UpdateSummaryRequest format
+            from .models import UpdateSummaryRequest
+
+            update_request = UpdateSummaryRequest(
+                summary=summary_data.get("summary"),
+                previous_work=summary_data.get("previous_work"),
+                hypothesis=summary_data.get("hypothesis"),
+                distinction=summary_data.get("distinction"),
+                methodology=summary_data.get("methodology"),
+                results=summary_data.get("results"),
+                limitations=summary_data.get("limitations"),
+                implications=summary_data.get("implication"),
+            )
+
+            # Update the document with the generated summary
+            success = await db.update_document_summary(document_id, update_request)
+            if not success:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to save generated summary to database",
+                )
+
+            # Return the updated summary
+            return await db.get_document_summary(document_id)
+
+        except HTTPException:
+            # Re-raise HTTP exceptions as is
+            raise
+        except Exception as e:
+            logger.error(f"Error generating summary for document {document_id}: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to generate summary: {str(e)}"
+            )
+
     @router.patch("/documents/{document_id}/metadata", response_model=DocumentMetadata)
     async def update_document_metadata(
         document_id: UUID = FastAPIPath(...),

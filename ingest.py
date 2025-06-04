@@ -61,17 +61,6 @@ class PaperMetadata(BaseModel):
     arxiv_id: Optional[str] = None
 
 
-class PaperSummary(BaseModel):
-    summary: str
-    previous_work: str
-    hypothesis: str
-    distinction: str
-    methodology: str
-    results: str
-    limitations: str
-    implication: str
-
-
 async def pdf_to_markdown(pdf_path: str) -> str:
     """Use docling to convert PDF to Markdown"""
     try:
@@ -448,82 +437,6 @@ async def extract_metadata(
     return await extract_metadata_llm_fallback(markdown, genai_client)
 
 
-async def generate_summary(markdown: str, genai_client: genai.Client) -> dict:
-    """Use a single LLM call to generate all sections in a structured format"""
-    prompt = f"""
-Please analyze the following academic paper thoroughly and provide structured responses to each of the following aspects in necessary detail. 
-Be precise, concise and focused on the key points for the reader to understand the paper, and maintain an academic tone.
-If needed, use bullet points and markdown formatting to make each section more readable.
-
-Provide your response as JSON with exactly these fields:
-1. "summary": Summarize the entire research paper in 10-20 sentences. Focus on the core objective, approach, and findings.
-2. "previous_work": What is the theoretical background and related work in the field? Explain in detail so that even a beginner in this field can understand the background of why the paper was written.
-3. "hypothesis": What is the hypothesis of the paper? and What problem is the paper trying to solve?
-4. "distinction": What is the key distinction or novel contribution of this work compared to prior research in the same field?
-5. "methodology": Describe the research design and methodology in detail, including participants (if any), tools, procedures, models, and any statistical analyses used.
-6. "results": Interpret the main findings of the study. Highlight statistical outcomes if they are crucial. 
-7. "limitations": What are the limitations of the study?
-8. "implication": Explain the broader implications of this study for theory, practice, or future research directions.
-
-Return only valid JSON matching this schema. Do not include any explanation or extra text except for the JSON.
-
-Markdown:
-{markdown}
-"""
-
-    # Default values in case of extraction failure
-    default_summary = {
-        "summary": "Summary not available due to processing error.",
-        "previous_work": "Previous work analysis not available.",
-        "hypothesis": "Hypothesis not available.",
-        "distinction": "Distinction analysis not available.",
-        "methodology": "Methodology not available.",
-        "results": "Results not available.",
-        "limitations": "Limitations not available.",
-        "implication": "Implications not available.",
-    }
-
-    try:
-        response = await genai_client.aio.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=PaperSummary,
-            ),
-        )
-        raw_content = response.text
-        logger.debug(f"LLM raw response (summary): {raw_content}")
-
-        # Try to validate with Pydantic
-        try:
-            data = PaperSummary.model_validate_json(raw_content).model_dump()
-            logger.info("✅ Summary extraction successful")
-            return data
-        except (ValidationError, json.JSONDecodeError) as validation_error:
-            logger.warning(
-                f"⚠️ Summary JSON validation failed, trying to parse manually: {validation_error}"
-            )
-
-            # Try to parse JSON manually and extract what we can
-            try:
-                raw_data = json.loads(raw_content)
-                extracted_data = {}
-                for key in default_summary.keys():
-                    extracted_data[key] = raw_data.get(key, default_summary[key])
-
-                logger.info("✅ Partial summary extraction successful")
-                return extracted_data
-
-            except json.JSONDecodeError:
-                logger.warning("⚠️ Could not parse summary JSON at all, using defaults")
-                return default_summary
-
-    except Exception as e:
-        logger.error(f"❌ LLM summary extraction failed completely: {e}")
-        return default_summary
-
-
 async def get_embedding(text: str, genai_client: genai.Client) -> List[float]:
     """Use Google GenAI to get embedding"""
     try:
@@ -588,7 +501,6 @@ async def process_pdf(
     meta = await extract_metadata(
         markdown, genai_client, identifier_extractor, pdf_path
     )
-    summary = await generate_summary(markdown, genai_client)
     title_emb = await get_embedding(meta.get("title", ""), genai_client)
     abstract_emb = await get_embedding(meta.get("abstract", ""), genai_client)
 
@@ -608,14 +520,14 @@ async def process_pdf(
         doi=meta.get("doi"),
         arxiv_id=meta.get("arxiv_id"),
         markdown=markdown,
-        summary=summary.get("summary"),
-        previous_work=summary.get("previous_work"),
-        hypothesis=summary.get("hypothesis"),
-        distinction=summary.get("distinction"),
-        methodology=summary.get("methodology"),
-        results=summary.get("results"),
-        limitations=summary.get("limitations"),
-        implications=summary.get("implication"),
+        summary=None,  # Summary will be generated separately via API
+        previous_work=None,
+        hypothesis=None,
+        distinction=None,
+        methodology=None,
+        results=None,
+        limitations=None,
+        implications=None,
         title_embedding=title_emb,
         abstract_embedding=abstract_emb,
         status="processed",
