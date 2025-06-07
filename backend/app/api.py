@@ -41,7 +41,7 @@ def get_router(db: Database):
     router = APIRouter()
 
     # PDF serving endpoint - must come before other routes to avoid conflicts
-    @router.get("/pdf")
+    @router.get("/api/pdf")
     async def serve_pdf(
         path: str = Query(..., description="Relative path to the PDF file"),
         base_dir: str = Query(
@@ -118,7 +118,7 @@ def get_router(db: Database):
     # IMPORTANT: Specific routes must come BEFORE parameterized routes
     # to avoid route conflicts where 'search', 'folders', etc. are interpreted as document IDs
 
-    @router.get("/documents", response_model=DocumentListResponse)
+    @router.get("/api/documents", response_model=DocumentListResponse)
     async def list_documents(
         skip: int = Query(0, ge=0),
         limit: int = Query(50, ge=1, le=100),
@@ -129,7 +129,7 @@ def get_router(db: Database):
         return response
 
     # Search endpoints - must come before {document_id} routes
-    @router.get("/documents/search", response_model=SearchResponse)
+    @router.get("/api/documents/search", response_model=SearchResponse)
     async def search_documents(
         query: str = Query(..., min_length=1),
         folder_name: Optional[str] = None,
@@ -162,7 +162,7 @@ def get_router(db: Database):
             total_results=len(search_results),
         )
 
-    @router.get("/documents/search/keywords", response_model=KeywordSearchResponse)
+    @router.get("/api/documents/search/keywords", response_model=KeywordSearchResponse)
     async def search_by_keywords(
         keywords: List[str] = Query(..., min_length=1),
         search_mode: str = Query("any", regex="^(any|all)$"),
@@ -191,13 +191,13 @@ def get_router(db: Database):
         )
 
     # Folders endpoint - must come before {document_id} routes
-    @router.get("/documents/folders", response_model=FoldersResponse)
+    @router.get("/api/documents/folders", response_model=FoldersResponse)
     async def get_folders(base_path: Optional[str] = None):
         folders = await db.get_folders(base_path)
         return FoldersResponse(folders=folders)
 
     # Status endpoint - must come before {document_id} routes
-    @router.get("/documents/status", response_model=StatusResponse)
+    @router.get("/api/documents/status", response_model=StatusResponse)
     async def get_status(document_id: Optional[UUID] = None):
         status = await db.get_status(document_id)
         if document_id:
@@ -217,28 +217,32 @@ def get_router(db: Database):
             )
 
     # NOW the parameterized routes come AFTER all specific routes
-    @router.get("/documents/{document_id}", response_model=Document)
+    @router.get("/api/documents/{document_id}", response_model=Document)
     async def get_document(document_id: UUID = FastAPIPath(...)):
         document = await db.get_document(document_id)
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
         return document
 
-    @router.get("/documents/{document_id}/metadata", response_model=DocumentMetadata)
+    @router.get(
+        "/api/documents/{document_id}/metadata", response_model=DocumentMetadata
+    )
     async def get_document_metadata(document_id: UUID = FastAPIPath(...)):
         metadata = await db.get_document_metadata(document_id)
         if not metadata:
             raise HTTPException(status_code=404, detail="Document not found")
         return metadata
 
-    @router.get("/documents/{document_id}/summary", response_model=DocumentSummary)
+    @router.get("/api/documents/{document_id}/summary", response_model=DocumentSummary)
     async def get_document_summary(document_id: UUID = FastAPIPath(...)):
         summary = await db.get_document_summary(document_id)
         if not summary:
             raise HTTPException(status_code=404, detail="Document not found")
         return summary
 
-    @router.patch("/documents/{document_id}/summary", response_model=DocumentSummary)
+    @router.patch(
+        "/api/documents/{document_id}/summary", response_model=DocumentSummary
+    )
     async def update_document_summary(
         document_id: UUID = FastAPIPath(...),
         summary_data: UpdateSummaryRequest = Body(...),
@@ -308,7 +312,9 @@ def get_router(db: Database):
                 status_code=500, detail=f"Failed to generate summary: {str(e)}"
             )
 
-    @router.patch("/documents/{document_id}/metadata", response_model=DocumentMetadata)
+    @router.patch(
+        "/api/documents/{document_id}/metadata", response_model=DocumentMetadata
+    )
     async def update_document_metadata(
         document_id: UUID = FastAPIPath(...),
         metadata_data: UpdateMetadataRequest = Body(...),
@@ -318,7 +324,7 @@ def get_router(db: Database):
             raise HTTPException(status_code=404, detail="Document not found")
         return await db.get_document_metadata(document_id)
 
-    @router.patch("/documents/{document_id}/rating")
+    @router.patch("/api/documents/{document_id}/rating")
     async def update_document_rating(
         document_id: UUID = FastAPIPath(...),
         rating_data: UpdateRatingRequest = Body(...),
@@ -369,7 +375,7 @@ def get_router(db: Database):
         )
 
     # Chat endpoint
-    @router.post("/documents/{document_id}/chat", response_model=ChatResponse)
+    @router.post("/api/documents/{document_id}/chat", response_model=ChatResponse)
     async def chat_with_document(
         document_id: UUID = FastAPIPath(...),
         chat_request: ChatRequest = Body(...),
@@ -402,7 +408,7 @@ def get_router(db: Database):
                 status_code=500, detail="Failed to generate chat response"
             )
 
-    @router.get("/documents/{document_id}/thumbnail")
+    @router.get("/api/documents/{document_id}/thumbnail")
     async def get_document_thumbnail(
         document_id: UUID = FastAPIPath(...),
         width: int = Query(300, ge=100, le=800, description="Thumbnail width"),

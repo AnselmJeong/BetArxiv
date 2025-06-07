@@ -20,6 +20,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - betarxiv-network
 
   # Backend FastAPI Service
   backend:
@@ -31,7 +33,7 @@ services:
       - .env
     environment:
       - DATABASE_URL=postgresql://betarxiv:betarxiv_password@db:5432/betarxiv
-      - DOCS_BASE_DIR=/app/docs
+      - DOCS_BASE_DIR=/app/docs  # Override .env value for container
     ports:
       - "8001:8000"
     depends_on:

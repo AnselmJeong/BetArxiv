@@ -22,7 +22,7 @@ export default function ArchivePage() {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch('/api/documents/folders');
+        const response = await fetch('http://localhost:8001/api/documents/folders');
         
         if (!response.ok) {
           throw new Error(`Failed to fetch folders: ${response.status} ${response.statusText}`);

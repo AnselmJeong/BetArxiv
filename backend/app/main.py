@@ -86,7 +86,8 @@ app.add_middleware(
 )
 
 # Include the router after app creation
-app.include_router(get_router(db))
+router = get_router(db)
+app.include_router(router)
 logger.info("API routes registered.")
 
 
@@ -106,6 +107,47 @@ async def health_check():
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
+
+
+# Help endpoint
+@app.get("/help")
+async def get_help():
+    """Get API help and available endpoints"""
+    return {
+        "name": "Research Paper Knowledge Extraction API",
+        "version": "1.0.0",
+        "description": "API for managing and searching research papers with AI-powered features",
+        "documentation": {
+            "swagger_ui": "/docs",
+            "openapi_json": "/openapi.json",
+            "redoc": "/redoc",
+        },
+        "endpoints": {
+            "health": "/health",
+            "help": "/help",
+            "documents": {
+                "list": "/api/documents",
+                "get": "/api/documents/{document_id}",
+                "folders": "/api/documents/folders",
+                "search": "/api/documents/search",
+                "keyword_search": "/api/documents/search/keywords",
+                "status": "/api/documents/status",
+                "metadata": "/api/documents/{document_id}/metadata",
+                "summary": "/api/documents/{document_id}/summary",
+                "generate_summary": "/documents/{document_id}/generate-summary",
+                "rating": "/api/documents/{document_id}/rating",
+                "similar": "/documents/{document_id}/similar",
+                "chat": "/api/documents/{document_id}/chat",
+                "thumbnail": "/api/documents/{document_id}/thumbnail",
+            },
+            "files": {"serve_pdf": "/api/pdf"},
+        },
+        "usage": {
+            "authentication": "Not required for this version",
+            "rate_limits": "No rate limits currently applied",
+            "content_type": "application/json for most endpoints",
+        },
+    }
 
 
 # @app.on_event("startup")

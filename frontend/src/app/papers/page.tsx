@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, Loader2, ExternalLink, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -36,7 +36,7 @@ interface FoldersResponse {
 type SortField = 'title' | 'author' | 'journal' | 'year' | 'volume' | 'issue';
 type SortOrder = 'asc' | 'desc';
 
-export default function PapersPage() {
+function PapersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [papers, setPapers] = useState<Document[]>([]);
@@ -90,7 +90,7 @@ export default function PapersPage() {
   useEffect(() => {
     const fetchFolders = async () => {
       try {
-        const response = await fetch('/api/documents/folders');
+        const response = await fetch('http://localhost:8001/api/documents/folders');
         if (response.ok) {
           const data: FoldersResponse = await response.json();
           setFolders(data.folders);
@@ -124,7 +124,7 @@ export default function PapersPage() {
           params.append('folder_name', selectedFolder);
         }
         
-        const response = await fetch(`/api/documents?${params}`);
+        const response = await fetch(`http://localhost:8001/api/documents?${params}`);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch documents: ${response.status} ${response.statusText}`);
@@ -623,5 +623,17 @@ export default function PapersPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PapersPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-full bg-muted/50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    }>
+      <PapersPageContent />
+    </Suspense>
   );
 } 

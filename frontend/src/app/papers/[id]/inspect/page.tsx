@@ -14,11 +14,7 @@ import { Allotment } from 'allotment';
 import 'allotment/dist/style.css';
 import { ArrowLeft, Sparkles, Loader2, Star } from 'lucide-react';
 
-interface PageProps {
-  params: { id: string };
-}
-
-export default function PaperInspectPage({ params }: PageProps) {
+export default function PaperInspectPage() {
   const { id: documentId } = useParams();
   const router = useRouter();
   const { getPdfUrl } = usePdfPath();
@@ -36,7 +32,7 @@ export default function PaperInspectPage({ params }: PageProps) {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`/api/documents/${documentId}`);
+        const response = await fetch(`http://localhost:8001/api/documents/${documentId}`);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
@@ -71,7 +67,7 @@ export default function PaperInspectPage({ params }: PageProps) {
       setIsGeneratingSummary(true);
       setSummaryError(null);
       
-      const response = await fetch(`/api/documents/${documentId}/generate-summary`, {
+      const response = await fetch(`http://localhost:8001/api/documents/${documentId}/generate-summary`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,7 +109,7 @@ export default function PaperInspectPage({ params }: PageProps) {
       setIsUpdatingRating(true);
       setRatingError(null);
       
-      const response = await fetch(`/api/documents/${documentId}/rating`, {
+      const response = await fetch(`http://localhost:8001/api/documents/${documentId}/rating`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

@@ -21,7 +21,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-cache
 
 # Copy backend application
-COPY app/ ./app/
+COPY backend/app/ ./app/
 
 # Expose port
 EXPOSE 8000

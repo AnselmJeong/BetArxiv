@@ -96,6 +96,17 @@ export interface KeywordSearchResponse {
   case_sensitive: boolean;
 }
 
+export interface CombinedSearchRequest {
+  text_query?: string;
+  keywords?: string[];
+  keyword_mode?: "any" | "all";
+  exact_keyword_match?: boolean;
+  folder_name?: string;
+  limit?: number;
+  include_snippet?: boolean;
+  filters?: SearchFilters;
+}
+
 export interface Folder {
   name: string;
   path: string;

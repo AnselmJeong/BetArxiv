@@ -38,7 +38,7 @@ export default function ChatBox({ documentId }: ChatBoxProps) {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/documents/${documentId}/chat`, {
+      const response = await fetch(`http://localhost:8001/api/documents/${documentId}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
