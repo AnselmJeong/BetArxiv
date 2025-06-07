@@ -10,14 +10,14 @@ from pydantic import BaseModel, ValidationError
 from PIL import Image
 from pdf2image import convert_from_path
 
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GEMINI_EMBED_MODEL = "gemini-embedding-exp-03-07"
-GEMINI_CHAT_MODEL = "gemini-2.5-flash-preview-05-20"
+GEMINI_EMBED_MODEL = "text-embedding-004"
+GEMINI_CHAT_MODEL = "gemini-2.0-flash"
 
 
 class PaperSummary(BaseModel):
@@ -37,22 +37,18 @@ def get_genai_client():
     if not api_key:
         raise ValueError("GOOGLE_API_KEY environment variable is required")
 
-    genai.configure(api_key=api_key)
-    return genai
+    return genai.Client(api_key=api_key)
 
 
 async def get_embedding(text: str, client) -> list[float]:
     """Generate embedding for text using Google's embedding model"""
     try:
-        # Use the embedding model
-        model = "models/embedding-001"
         response = await asyncio.to_thread(
-            genai.embed_content,
-            model=model,
-            content=text,
-            task_type="retrieval_document",
+            client.models.embed_content,
+            model=GEMINI_EMBED_MODEL,
+            contents=text,
         )
-        return response["embedding"]
+        return response.embeddings[0].values
     except Exception as e:
         logger.error(f"Error generating embedding: {e}")
         raise
@@ -82,19 +78,31 @@ User Question: {user_message}
 Please provide a helpful and accurate response based on the paper content. If the question cannot be answered from the provided content, please say so clearly.
 """
 
-        # Use Gemini 2.0 Flash model for chat
-        model = genai.GenerativeModel(GEMINI_CHAT_MODEL)
-
-        # Generate response
+        # Generate response using new SDK
         response = await asyncio.to_thread(
-            model.generate_content,
-            context_prompt,
-            safety_settings={
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-            },
+            genai_client.models.generate_content,
+            model=GEMINI_CHAT_MODEL,
+            contents=context_prompt,
+            config=types.GenerateContentConfig(
+                safety_settings=[
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_HATE_SPEECH",
+                        threshold="BLOCK_MEDIUM_AND_ABOVE",
+                    ),
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                        threshold="BLOCK_MEDIUM_AND_ABOVE",
+                    ),
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        threshold="BLOCK_MEDIUM_AND_ABOVE",
+                    ),
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_HARASSMENT",
+                        threshold="BLOCK_MEDIUM_AND_ABOVE",
+                    ),
+                ],
+            ),
         )
 
         return response.text
@@ -198,69 +206,59 @@ Markdown:
 
     # Default values in case of extraction failure
     default_summary = {
-        "summary": "Summary not available due to processing error.",
-        "previous_work": "Previous work analysis not available.",
-        "hypothesis": "Hypothesis not available.",
-        "distinction": "Distinction analysis not available.",
-        "methodology": "Methodology not available.",
-        "results": "Results not available.",
-        "limitations": "Limitations not available.",
-        "implication": "Implications not available.",
+        "summary": "논문 요약을 생성할 수 없습니다.",
+        "previous_work": "선행 연구 정보를 추출할 수 없습니다.",
+        "hypothesis": "연구 가설을 파악할 수 없습니다.",
+        "distinction": "연구의 차별점을 식별할 수 없습니다.",
+        "methodology": "연구 방법론을 추출할 수 없습니다.",
+        "results": "연구 결과를 요약할 수 없습니다.",
+        "limitations": "연구 한계를 파악할 수 없습니다.",
+        "implication": "연구 의의를 추출할 수 없습니다.",
     }
 
     try:
-        # Use Gemini model for summary generation
-        model = genai.GenerativeModel(
-            GEMINI_CHAT_MODEL,
-            generation_config={
-                "response_mime_type": "application/json",
-            },
-        )
-
+        # Generate response using new SDK with JSON format
         response = await asyncio.to_thread(
-            model.generate_content,
-            prompt,
-            safety_settings={
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-            },
+            genai_client.models.generate_content,
+            model=GEMINI_CHAT_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=PaperSummary,
+                temperature=0.1,  # Lower temperature for more consistent JSON
+            ),
         )
 
-        raw_content = response.text
-        logger.debug(f"LLM raw response (summary): {raw_content}")
-
-        # Try to validate with Pydantic
+        # Try to parse the response as JSON
         try:
-            data = PaperSummary.model_validate_json(raw_content).model_dump()
-            logger.info("✅ Summary extraction successful")
-            return data
-        except (ValidationError, json.JSONDecodeError) as validation_error:
-            logger.warning(
-                f"⚠️ Summary JSON validation failed, trying to parse manually: {validation_error}"
-            )
+            if hasattr(response, "parsed") and response.parsed:
+                # If response.parsed is available, use it
+                summary_data = response.parsed.model_dump()
+            else:
+                # Otherwise parse the text
+                summary_data = json.loads(response.text)
 
-            # Try to parse JSON manually and extract what we can
-            try:
-                raw_data = json.loads(raw_content)
-                extracted_data = {}
-                for key in default_summary.keys():
-                    extracted_data[key] = raw_data.get(key, default_summary[key])
+            return summary_data
 
-                logger.info("✅ Partial summary extraction successful")
-                return extracted_data
-
-            except json.JSONDecodeError:
-                logger.warning("⚠️ Could not parse summary JSON at all, using defaults")
-                return default_summary
+        except (json.JSONDecodeError, ValidationError) as e:
+            logger.warning(f"JSON parsing failed: {e}, using default summary")
+            return default_summary
 
     except Exception as e:
-        logger.error(f"❌ LLM summary extraction failed completely: {e}")
+        logger.error(f"Error generating summary: {e}")
         return default_summary
 
 
 def cosine_similarity(vec1, vec2):
-    v1 = np.array(vec1)
-    v2 = np.array(vec2)
-    return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
+    """Calculate cosine similarity between two vectors"""
+    vec1_array = np.array(vec1)
+    vec2_array = np.array(vec2)
+
+    dot_product = np.dot(vec1_array, vec2_array)
+    norm_vec1 = np.linalg.norm(vec1_array)
+    norm_vec2 = np.linalg.norm(vec2_array)
+
+    if norm_vec1 == 0 or norm_vec2 == 0:
+        return 0
+
+    return dot_product / (norm_vec1 * norm_vec2)

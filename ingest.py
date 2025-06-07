@@ -9,7 +9,6 @@ import os
 import asyncio
 from pathlib import Path
 import argparse
-import traceback
 from tqdm import tqdm
 import dotenv
 import logging
@@ -21,7 +20,6 @@ from pydantic import ValidationError
 from docling.document_converter import DocumentConverter
 from google import genai
 from google.genai import types
-import numpy as np
 from pypdf import PdfReader
 
 from app.models import DocumentCreate
