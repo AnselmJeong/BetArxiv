@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with pgvector extension
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: betarxiv-db
+    environment:
+      POSTGRES_DB: betarxiv
+      POSTGRES_USER: betarxiv
+      POSTGRES_PASSWORD: betarxiv_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/app/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U betarxiv -d betarxiv"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend FastAPI Service
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: betarxiv-backend
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://betarxiv:betarxiv_password@db:5432/betarxiv
+      - DOCS_BASE_DIR=/app/docs
+    ports:
+      - "8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ${DOCS_BASE_DIR}:/app/docs  # Document archive mapping from .env
+      - ./documents:/app/documents  # For temporary PDF storage
+    networks:
+      - betarxiv-network
+
+  # Frontend Next.js Service
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    container_name: betarxiv-frontend
+    env_file:
+      - .env
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - NODE_ENV=production
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - betarxiv-network
+
+volumes:
+  postgres_data:
+
+networks:
+  betarxiv-network:
+    driver: bridge 
