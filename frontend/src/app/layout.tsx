@@ -8,6 +8,8 @@ import Link from "next/link";
 import { AppLayout } from "@/components/app-layout";
 import { SettingsProvider } from "@/contexts/settings-context";
 import { NavigationProvider } from "@/contexts/navigation-context";
+import { StagewiseToolbar } from "@stagewise/toolbar-next";
+import { ReactPlugin } from "@stagewise-plugins/react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,6 +34,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}>
+        <StagewiseToolbar 
+          config={{
+            plugins: [ReactPlugin],
+          }}
+        />
         <SettingsProvider>
           <NavigationProvider>
             <div className="h-screen flex flex-col">

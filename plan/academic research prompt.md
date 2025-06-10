@@ -6,10 +6,11 @@ For a user unfamiliar with the topic covered in the paper, it is inevitable that
 
 1. For each topic/sub-topic: 
    1. Short definition or explanation
-   2. Summarize past research before this paper: key facts, trends or recent developments . 
-   3. Highlight any debates or unresolved issues 
+   2. Summarize past research before this paper along the author's presentation: key facts, trends or recent developments . 
+   3. Highlight any debates or unresolved issues mentioned in the article
    4. Mention influential studies or authors (cite properly), include notable data, statistics, or real-world examples where relevant.
-   5. Finish with a summary of current knowledge gaps or future directions. Guidelines
+   5. Mention the relevance to the content of this study
+   6. Finish with a summary of current knowledge gaps or future directions. 
 
 2. If there are any topics or concepts that you think are necessary to understand this study, you can add additional topics or contents with background explanations through web search even if they are not mentioned in the paper.
 
