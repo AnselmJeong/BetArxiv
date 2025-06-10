@@ -17,3 +17,4 @@ For a user unfamiliar with the topic covered in the paper, it is inevitable that
 
 
 Use clear and  academic tone – Cite sources with author, title, and year – Prioritize accuracy and relevance – Keep formatting clean and skimmable
+Output in markdown format, use appropriate syntax to highlight or mark the headings.

@@ -50,9 +50,9 @@ def get_router(db: Database):
     ):
         """Serve PDF files from the local file system."""
         try:
-            # In Docker, always use /app/docs regardless of base_dir parameter
-            # The host path gets mounted to /app/docs inside the container
-            base_directory = Path("/app/docs").resolve()
+            # Use DOCS_BASE_DIR environment variable for consistent path handling
+            # In Docker: DOCS_BASE_DIR=/app/docs, In development: DOCS_BASE_DIR=/your/local/path
+            base_directory = Path(os.getenv("DOCS_BASE_DIR", "docs")).resolve()
 
             # Handle path - assume it's always relative to base directory
             relative_path = Path(path)
@@ -311,6 +311,58 @@ def get_router(db: Database):
             logger.error(f"Error generating summary for document {document_id}: {e}")
             raise HTTPException(
                 status_code=500, detail=f"Failed to generate summary: {str(e)}"
+            )
+
+    @router.post("/documents/{document_id}/generate-background")
+    async def generate_document_background(
+        document_id: UUID = FastAPIPath(...),
+    ):
+        """Generate background explanation for a document using its markdown content"""
+        try:
+            # Get the document to access its markdown content
+            document = await db.get_document(document_id)
+            if not document:
+                raise HTTPException(status_code=404, detail="Document not found")
+
+            if not document.markdown:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Document has no markdown content to generate background from",
+                )
+
+            # Import the background generation function
+            from .utils import generate_background, get_genai_client
+
+            # Generate background using the document's markdown content
+            genai_client = get_genai_client()
+            background_content = await generate_background(
+                document.markdown, genai_client
+            )
+
+            # Save the generated background to the database
+            success = await db.update_document_background(
+                document_id, background_content
+            )
+            if not success:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to save generated background to database",
+                )
+
+            # Return the generated background content
+            return {
+                "document_id": document_id,
+                "background": background_content,
+                "message": "Background generated successfully",
+            }
+
+        except HTTPException:
+            # Re-raise HTTP exceptions as is
+            raise
+        except Exception as e:
+            logger.error(f"Error generating background for document {document_id}: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to generate background: {str(e)}"
             )
 
     @router.patch(

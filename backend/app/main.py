@@ -135,6 +135,7 @@ async def get_help():
                 "metadata": "/api/documents/{document_id}/metadata",
                 "summary": "/api/documents/{document_id}/summary",
                 "generate_summary": "/documents/{document_id}/generate-summary",
+                "generate_background": "/documents/{document_id}/generate-background",
                 "rating": "/api/documents/{document_id}/rating",
                 "similar": "/documents/{document_id}/similar",
                 "chat": "/api/documents/{document_id}/chat",

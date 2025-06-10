@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS documents (
     results TEXT,
     limitations TEXT,
     implications TEXT,
+    background TEXT,
     
     -- Vector embeddings for semantic search
     title_embedding vector(768),

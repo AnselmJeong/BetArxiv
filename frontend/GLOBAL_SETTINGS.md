@@ -101,7 +101,7 @@ export default function PaperInspectPage() {
 Set the `NEXT_PUBLIC_API_URL` environment variable to point to your FastAPI backend:
 
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8001
 ```
 
 The default baseDirectory is set to `/Volumes/Aquatope/_DEV_/BetArxiv/docs` but can be changed in the settings page. 

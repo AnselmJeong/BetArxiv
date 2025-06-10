@@ -5,7 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ExternalLink, Eye, Calendar, Users, BookOpen, Hash, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, ExternalLink, Eye, Calendar, Users, BookOpen, Hash, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { Document } from '@/types/api';
 import { useNavigation } from '@/contexts/navigation-context';
 
@@ -15,6 +17,9 @@ export default function PaperDetailPage() {
   const [paper, setPaper] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [background, setBackground] = useState<string | null>(null);
+  const [backgroundLoading, setBackgroundLoading] = useState(false);
+  const [backgroundError, setBackgroundError] = useState<string | null>(null);
   
   const { 
     navigationState, 
@@ -37,6 +42,11 @@ export default function PaperDetailPage() {
         
         const data: Document = await response.json();
         setPaper(data);
+        
+        // Set existing background if available
+        if (data.background) {
+          setBackground(data.background);
+        }
         
         // Update navigation state if this document is in the set
         if (typeof id === 'string' && navigationState) {
@@ -125,6 +135,35 @@ export default function PaperDetailPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [previousDocument, nextDocument, navigationState, router, handleBackToPapers]);
+
+  // Generate background explanation
+  const handleGenerateBackground = async () => {
+    if (!id || backgroundLoading) return;
+    
+    try {
+      setBackgroundLoading(true);
+      setBackgroundError(null);
+      
+      const response = await fetch(`http://localhost:8001/documents/${id}/generate-background`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to generate background: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setBackground(data.background);
+    } catch (err) {
+      console.error('Error generating background:', err);
+      setBackgroundError(err instanceof Error ? err.message : 'Failed to generate background');
+    } finally {
+      setBackgroundLoading(false);
+    }
+  };
 
   // Generate external link based on DOI or ArXiv ID
   const getExternalLink = (): { url: string; label: string } | null => {
@@ -308,36 +347,98 @@ export default function PaperDetailPage() {
       </div>
 
 
-      {/* Abstract */}
+      {/* Abstract and Background Tabs */}
       {paper.abstract && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Abstract</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-700 leading-relaxed">{paper.abstract}</p>
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="abstract" className="mb-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="abstract">Abstract</TabsTrigger>
+            <TabsTrigger value="background">Background</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="abstract" className="space-y-6">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-gray-700 leading-relaxed">{paper.abstract}</p>
+              </CardContent>
+            </Card>
+            
+            {/* Keywords */}
+            {paper.keywords && paper.keywords.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Keywords
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {paper.keywords.map((keyword, index) => (
+                      <Badge key={index} variant="outline">{keyword}</Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="background">
+            <div className="space-y-4">
+              {!background && (
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={handleGenerateBackground}
+                  disabled={backgroundLoading}
+                >
+                  {backgroundLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {backgroundLoading ? 'Generating Background...' : 'Explain Background'}
+                </Button>
+              )}
+              <Card>
+                <CardContent className="pt-6">
+                  {backgroundError ? (
+                    <div className="text-red-600 text-center py-8">
+                      Error: {backgroundError}
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleGenerateBackground}
+                        className="mt-4"
+                        disabled={backgroundLoading}
+                      >
+                        Try Again
+                      </Button>
+                    </div>
+                  ) : background ? (
+                    <div>
+                      <div className="prose prose-gray max-w-none">
+                        <ReactMarkdown>{background}</ReactMarkdown>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          setBackground(null);
+                          setBackgroundError(null);
+                        }}
+                        className="mt-4"
+                      >
+                        Regenerate Background
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-gray-500 text-center py-8">
+                      Background information will be displayed here in markdown format.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       )}
 
-      {/* Keywords */}
-      {paper.keywords && paper.keywords.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {/* <Hash className="w-5 h-5" /> */}
-              Keywords
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {paper.keywords.map((keyword, index) => (
-                <Badge key={index} variant="outline">{keyword}</Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
     </div>
   );

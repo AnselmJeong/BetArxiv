@@ -25,6 +25,7 @@ export interface Document {
   results?: string;
   limitations?: string;
   implications?: string;
+  background?: string;
 }
 
 export interface DocumentSummary {

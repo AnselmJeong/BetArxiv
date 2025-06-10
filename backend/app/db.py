@@ -93,7 +93,7 @@ class Database:
         query = """
             SELECT id, title, authors, journal_name, publication_year,
                    abstract, keywords, volume, issue, url, doi, arxiv_id, markdown,
-                   summary, previous_work, hypothesis, distinction, methodology, results, limitations, implications,
+                   summary, previous_work, hypothesis, distinction, methodology, results, limitations, implications, background,
                    title_embedding, abstract_embedding, status, folder_name
             FROM documents
             WHERE id = %s
@@ -140,7 +140,7 @@ class Database:
         self, document_id: UUID
     ) -> Optional[DocumentSummary]:
         query = """
-        SELECT summary, previous_work, hypothesis, distinction, methodology, results, limitations, implications 
+        SELECT summary, previous_work, hypothesis, distinction, methodology, results, limitations, implications, background 
         FROM documents WHERE id=%s
         """
         async with self.pool.cursor() as cur:
@@ -227,6 +227,17 @@ class Database:
         """Update the rating for a specific document."""
         query = "UPDATE documents SET rating=%s, updated_at=NOW() WHERE id=%s"
         values = [rating_data.rating, str(document_id)]
+
+        async with self.pool.cursor() as cur:
+            await cur.execute(query, values)
+            return cur.rowcount > 0
+
+    async def update_document_background(
+        self, document_id: UUID, background: str
+    ) -> bool:
+        """Update the background for a specific document."""
+        query = "UPDATE documents SET background=%s, updated_at=NOW() WHERE id=%s"
+        values = [background, str(document_id)]
 
         async with self.pool.cursor() as cur:
             await cur.execute(query, values)

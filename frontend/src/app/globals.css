@@ -163,3 +163,18 @@
 .allotment-separator:hover .allotment-separator-line {
   opacity: 0.6;
 }
+
+
+.prose h2 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose h3 {
+  font-size: 1.25em;
+  font-weight: 700;
+  margin-top: 1.25em;
+  margin-bottom: 0.25em;
+}

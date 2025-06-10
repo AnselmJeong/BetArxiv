@@ -30,6 +30,7 @@ class DocumentCreate(DocumentBase):
     results: Optional[str] = None
     limitations: Optional[str] = None
     implications: Optional[str] = None
+    background: Optional[str] = None
     title_embedding: Optional[List[float]] = None
     abstract_embedding: Optional[List[float]] = None
     status: Optional[str] = "pending"
@@ -65,6 +66,7 @@ class DocumentSummary(BaseModel):
     results: Optional[str] = None
     limitations: Optional[str] = None
     implications: Optional[str] = None
+    background: Optional[str] = None
 
 
 class DocumentEmbedding(BaseModel):
@@ -159,6 +161,7 @@ class UpdateSummaryRequest(BaseModel):
     results: Optional[str] = None
     limitations: Optional[str] = None
     implications: Optional[str] = None
+    background: Optional[str] = None
 
 
 class UpdateMetadataRequest(BaseModel):
