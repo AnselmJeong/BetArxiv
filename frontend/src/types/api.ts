@@ -15,6 +15,7 @@ export interface Document {
   url?: string;
   doi?: string;
   arxiv_id?: string;
+  rating?: number;
   // Summary fields
   summary?: string;
   previous_work?: string;
@@ -93,6 +94,17 @@ export interface KeywordSearchResponse {
   total_results: number;
   exact_match: boolean;
   case_sensitive: boolean;
+}
+
+export interface CombinedSearchRequest {
+  text_query?: string;
+  keywords?: string[];
+  keyword_mode?: "any" | "all";
+  exact_keyword_match?: boolean;
+  folder_name?: string;
+  limit?: number;
+  include_snippet?: boolean;
+  filters?: SearchFilters;
 }
 
 export interface Folder {

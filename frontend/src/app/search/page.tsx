@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,7 +88,7 @@ const loadStringFromLocalStorage = (key: string, defaultValue: string): string =
   }
 };
 
-export default function SearchPage() {
+function SearchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -216,7 +216,7 @@ export default function SearchPage() {
     
     try {
       const response = await fetch(
-        `/api/documents/search?query=${encodeURIComponent(semanticState.query)}&k=20`,
+        `http://localhost:8001/api/documents/search?query=${encodeURIComponent(semanticState.query)}&k=20`,
         {
           method: 'GET',
           headers: {
@@ -266,7 +266,7 @@ export default function SearchPage() {
       queryParams.append('include_snippet', 'true');
 
       const response = await fetch(
-        `/api/documents/search/keywords?${queryParams.toString()}`,
+        `http://localhost:8001/api/documents/search/keywords?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -302,7 +302,7 @@ export default function SearchPage() {
     
     try {
       const response = await fetch(
-        `/api/documents/search?query=${encodeURIComponent(query)}&k=20`,
+        `http://localhost:8001/api/documents/search?query=${encodeURIComponent(query)}&k=20`,
         {
           method: 'GET',
           headers: {
@@ -352,7 +352,7 @@ export default function SearchPage() {
       queryParams.append('include_snippet', 'true');
 
       const response = await fetch(
-        `/api/documents/search/keywords?${queryParams.toString()}`,
+        `http://localhost:8001/api/documents/search/keywords?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -483,7 +483,7 @@ export default function SearchPage() {
               {currentState.results.map((result, index) => {
                 const [imageError, setImageError] = useState(false);
                 const [imageLoading, setImageLoading] = useState(true);
-                const thumbnailUrl = `/api/documents/${result.id}/thumbnail?width=280&height=200`;
+                const thumbnailUrl = `http://localhost:8001/api/documents/${result.id}/thumbnail?width=280&height=200`;
 
                 const handleImageLoad = () => setImageLoading(false);
                 const handleImageError = () => {
@@ -649,5 +649,20 @@ export default function SearchPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-full bg-muted/50 flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Search className="w-8 h-8 animate-pulse" />
+          <span>Loading search...</span>
+        </div>
+      </div>
+    }>
+      <SearchPageContent />
+    </Suspense>
   );
 } 

@@ -8,7 +8,7 @@ A FastAPI-based service for searching, browsing, and managing research papers st
 
 **BetArxiv** is now structured with two main components:
 
-1. **Read-Only FastAPI Service** (`app/`) - Provides search, browse, and document management endpoints
+1. **Read-Only FastAPI Service** (`backend/app/`) - Provides search, browse, and document management endpoints
 2. **Batch Processing Script** (`batch_processor.py`) - Handles PDF ingestion and processing using LLMs
 
 This separation allows for:
@@ -30,7 +30,7 @@ This separation allows for:
 ```bash
 # Install PostgreSQL with pgvector extension
 # Create database and run schema
-psql -d your_db < app/schema.sql
+psql -d your_db < backend/app/schema.sql
 ```
 
 ### 2. Install Dependencies
@@ -48,7 +48,7 @@ DIRECTORY=./docs  # Directory containing PDFs for batch processing
 ### 4. Run API Server
 ```bash
 # Start the FastAPI server
-uvicorn app.main:app --reload --port 8000
+uvicorn backend.app.main:app --reload --port 8000
 ```
 
 ### 5. Process PDFs (Optional)
@@ -170,12 +170,13 @@ pytest test_api.py::TestDatabaseOperations -v
 ### Project Structure
 ```
 betarxiv/
-├── app/                    # FastAPI application
-│   ├── main.py            # FastAPI app and startup
-│   ├── api.py             # API route handlers
-│   ├── db.py              # Database operations
-│   ├── models.py          # Pydantic models
-│   └── schema.sql         # Database schema
+├── backend/
+│   └── app/               # FastAPI application
+│       ├── main.py        # FastAPI app and startup
+│       ├── api.py         # API route handlers
+│       ├── db.py          # Database operations
+│       ├── models.py      # Pydantic models
+│       └── schema.sql     # Database schema
 ├── batch_processor.py     # PDF processing script
 ├── test_api.py           # Test suite
 ├── verify_setup.py       # Setup verification

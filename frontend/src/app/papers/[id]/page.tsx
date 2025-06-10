@@ -29,7 +29,7 @@ export default function PaperDetailPage() {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`/api/documents/${id}`);
+        const response = await fetch(`http://localhost:8001/api/documents/${id}`);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch paper: ${response.status} ${response.statusText}`);

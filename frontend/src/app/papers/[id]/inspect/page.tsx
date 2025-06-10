@@ -12,19 +12,19 @@ import { useParams, useRouter } from 'next/navigation';
 import { Document } from '@/types/api';
 import { Allotment } from 'allotment';
 import 'allotment/dist/style.css';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2, Star } from 'lucide-react';
 
-interface PageProps {
-  params: { id: string };
-}
-
-export default function PaperInspectPage({ params }: PageProps) {
+export default function PaperInspectPage() {
   const { id: documentId } = useParams();
   const router = useRouter();
   const { getPdfUrl } = usePdfPath();
   const [document, setDocument] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [isUpdatingRating, setIsUpdatingRating] = useState(false);
+  const [ratingError, setRatingError] = useState<string | null>(null);
   
   // Fetch document data to get the actual file path
   useEffect(() => {
@@ -32,7 +32,7 @@ export default function PaperInspectPage({ params }: PageProps) {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`/api/documents/${documentId}`);
+        const response = await fetch(`http://localhost:8001/api/documents/${documentId}`);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
@@ -58,6 +58,133 @@ export default function PaperInspectPage({ params }: PageProps) {
 
   const handleBackToOverview = () => {
     router.push(`/papers/${documentId}`);
+  };
+
+  const handleGenerateSummary = async () => {
+    if (!documentId || !document) return;
+    
+    try {
+      setIsGeneratingSummary(true);
+      setSummaryError(null);
+      
+      const response = await fetch(`http://localhost:8001/api/documents/${documentId}/generate-summary`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Failed to generate summary: ${response.status}`);
+      }
+      
+      const summaryData = await response.json();
+      
+      // Update the document state with the new summary data
+      setDocument(prev => prev ? {
+        ...prev,
+        summary: summaryData.summary,
+        previous_work: summaryData.previous_work,
+        hypothesis: summaryData.hypothesis,
+        distinction: summaryData.distinction,
+        methodology: summaryData.methodology,
+        results: summaryData.results,
+        limitations: summaryData.limitations,
+        implications: summaryData.implications,
+      } : null);
+      
+    } catch (err) {
+      console.error('Error generating summary:', err);
+      setSummaryError(err instanceof Error ? err.message : 'Failed to generate summary');
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
+  const handleRatingUpdate = async (rating: number) => {
+    if (!documentId || !document) return;
+    
+    try {
+      setIsUpdatingRating(true);
+      setRatingError(null);
+      
+      const response = await fetch(`http://localhost:8001/api/documents/${documentId}/rating`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rating }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Failed to update rating: ${response.status}`);
+      }
+      
+      // Update the document state with the new rating
+      setDocument(prev => prev ? {
+        ...prev,
+        rating: rating,
+      } : null);
+      
+    } catch (err) {
+      console.error('Error updating rating:', err);
+      setRatingError(err instanceof Error ? err.message : 'Failed to update rating');
+    } finally {
+      setIsUpdatingRating(false);
+    }
+  };
+
+  const hasSummaryContent = document && (
+    document.summary || 
+    document.previous_work || 
+    document.hypothesis || 
+    document.distinction || 
+    document.methodology || 
+    document.results || 
+    document.limitations || 
+    document.implications
+  );
+
+  const RatingComponent = () => {
+    if (!document) return null;
+    
+    return (
+      <div className="flex flex-col gap-1 mb-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">Your Rating:</span>
+          {ratingError && (
+            <span className="text-xs text-red-500">Error updating rating</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              onClick={() => !isUpdatingRating && handleRatingUpdate(star)}
+              disabled={isUpdatingRating}
+              className={`w-4 h-4 transition-colors ${
+                isUpdatingRating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-110'
+              }`}
+            >
+              <Star
+                className={`w-4 h-4 ${
+                  document.rating && star <= document.rating
+                    ? 'fill-yellow-400 text-yellow-400'
+                    : 'text-gray-300 hover:text-yellow-400'
+                }`}
+              />
+            </button>
+          ))}
+          {document.rating && (
+            <span className="text-xs text-muted-foreground ml-2">
+              {document.rating}/5
+            </span>
+          )}
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -159,104 +286,137 @@ export default function PaperInspectPage({ params }: PageProps) {
                   {/* Summary Section */}
                   <Allotment.Pane>
                     <Card className="h-full p-4 flex flex-col min-h-0 overflow-hidden mb-2">
-                      <Tabs defaultValue="summary" className="w-full h-full flex flex-col min-h-0 overflow-hidden">
-                        <div className="mb-3 flex-shrink-0">
-                          <TabsList className="grid grid-cols-4 mb-2 w-full text-xs">
-                            <TabsTrigger value="summary" className="text-xs">Summary</TabsTrigger>
-                            <TabsTrigger value="previous_work" className="text-xs">Previous</TabsTrigger>
-                            <TabsTrigger value="hypothesis" className="text-xs">Hypothesis</TabsTrigger>
-                            <TabsTrigger value="distinction" className="text-xs">Distinction</TabsTrigger>
-                          </TabsList>
-                          <TabsList className="grid grid-cols-4 w-full text-xs">
-                            <TabsTrigger value="methodology" className="text-xs">Method</TabsTrigger>
-                            <TabsTrigger value="results" className="text-xs">Results</TabsTrigger>
-                            <TabsTrigger value="limitations" className="text-xs">Limits</TabsTrigger>
-                            <TabsTrigger value="implications" className="text-xs">Implications</TabsTrigger>
-                          </TabsList>
+                      <RatingComponent />
+                      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                        <div className="flex-1">
+                          <Tabs defaultValue="summary" className="w-full h-full flex flex-col min-h-0 overflow-hidden">
+                            <div className="mb-3 flex-shrink-0">
+                              <TabsList className="grid grid-cols-4 mb-2 w-full text-xs">
+                                <TabsTrigger value="summary" className="text-xs">Summary</TabsTrigger>
+                                <TabsTrigger value="previous_work" className="text-xs">Previous</TabsTrigger>
+                                <TabsTrigger value="hypothesis" className="text-xs">Hypothesis</TabsTrigger>
+                                <TabsTrigger value="distinction" className="text-xs">Distinction</TabsTrigger>
+                              </TabsList>
+                              <TabsList className="grid grid-cols-4 w-full text-xs">
+                                <TabsTrigger value="methodology" className="text-xs">Method</TabsTrigger>
+                                <TabsTrigger value="results" className="text-xs">Results</TabsTrigger>
+                                <TabsTrigger value="limitations" className="text-xs">Limits</TabsTrigger>
+                                <TabsTrigger value="implications" className="text-xs">Implications</TabsTrigger>
+                              </TabsList>
+                            </div>
+                            <div className="flex-1 min-h-0 overflow-hidden">
+                              <TabsContent value="summary" className="h-full overflow-y-auto pr-2">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h3 className="font-semibold text-sm">Summary</h3>
+                                  {!hasSummaryContent && (
+                                    <Button
+                                      onClick={handleGenerateSummary}
+                                      disabled={isGeneratingSummary}
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-7"
+                                    >
+                                      {isGeneratingSummary ? (
+                                        <>
+                                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                          Generating...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Sparkles className="w-3 h-3 mr-1" />
+                                          Generate Summary
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
+                                {summaryError && (
+                                  <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
+                                    {summaryError}
+                                  </div>
+                                )}
+                                <div className="text-xs text-muted-foreground leading-relaxed">
+                                  {document.summary ? (
+                                    <MarkdownRenderer content={document.summary} />
+                                  ) : (
+                                    <p>No summary information available. Click "Generate Summary" to create one.</p>
+                                  )}
+                                </div>
+                              </TabsContent>
+                              <TabsContent value="previous_work" className="h-full overflow-y-auto pr-2">
+                                <h3 className="font-semibold mb-2 text-sm">Previous Work</h3>
+                                <div className="text-xs text-muted-foreground leading-relaxed">
+                                  {document.previous_work ? (
+                                    <MarkdownRenderer content={document.previous_work} />
+                                  ) : (
+                                    <p>No previous work information available.</p>
+                                  )}
+                                </div>
+                              </TabsContent>
+                              <TabsContent value="hypothesis" className="h-full overflow-y-auto pr-2">
+                                <h3 className="font-semibold mb-2 text-sm">Hypothesis</h3>
+                                <div className="text-xs text-muted-foreground leading-relaxed">
+                                  {document.hypothesis ? (
+                                    <MarkdownRenderer content={document.hypothesis} />
+                                  ) : (
+                                    <p>No hypothesis information available.</p>
+                                  )}
+                                </div>
+                              </TabsContent>
+                              <TabsContent value="distinction" className="h-full overflow-y-auto pr-2">
+                                <h3 className="font-semibold mb-2 text-sm">Distinction</h3>
+                                <div className="text-xs text-muted-foreground leading-relaxed">
+                                  {document.distinction ? (
+                                    <MarkdownRenderer content={document.distinction} />
+                                  ) : (
+                                    <p>No distinction information available.</p>
+                                  )}
+                                </div>
+                              </TabsContent>
+                              <TabsContent value="methodology" className="h-full overflow-y-auto pr-2">
+                                <h3 className="font-semibold mb-2 text-sm">Methodology</h3>
+                                <div className="text-xs text-muted-foreground leading-relaxed">
+                                  {document.methodology ? (
+                                    <MarkdownRenderer content={document.methodology} />
+                                  ) : (
+                                    <p>No methodology information available.</p>
+                                  )}
+                                </div>
+                              </TabsContent>
+                              <TabsContent value="results" className="h-full overflow-y-auto pr-2">
+                                <h3 className="font-semibold mb-2 text-sm">Results</h3>
+                                <div className="text-xs text-muted-foreground leading-relaxed">
+                                  {document.results ? (
+                                    <MarkdownRenderer content={document.results} />
+                                  ) : (
+                                    <p>No results information available.</p>
+                                  )}
+                                </div>
+                              </TabsContent>
+                              <TabsContent value="limitations" className="h-full overflow-y-auto pr-2">
+                                <h3 className="font-semibold mb-2 text-sm">Limitations</h3>
+                                <div className="text-xs text-muted-foreground leading-relaxed">
+                                  {document.limitations ? (
+                                    <MarkdownRenderer content={document.limitations} />
+                                  ) : (
+                                    <p>No limitations information available.</p>
+                                  )}
+                                </div>
+                              </TabsContent>
+                              <TabsContent value="implications" className="h-full overflow-y-auto pr-2">
+                                <h3 className="font-semibold mb-2 text-sm">Implications</h3>
+                                <div className="text-xs text-muted-foreground leading-relaxed">
+                                  {document.implications ? (
+                                    <MarkdownRenderer content={document.implications} />
+                                  ) : (
+                                    <p>No implications information available.</p>
+                                  )}
+                                </div>
+                              </TabsContent>
+                            </div>
+                          </Tabs>
                         </div>
-                        <div className="flex-1 min-h-0 overflow-hidden">
-                          <TabsContent value="summary" className="h-full overflow-y-auto pr-2">
-                            <h3 className="font-semibold mb-2 text-sm">Summary</h3>
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                              {document.summary ? (
-                                <MarkdownRenderer content={document.summary} />
-                              ) : (
-                                <p>No summary information available.</p>
-                              )}
-                            </div>
-                          </TabsContent>
-                          <TabsContent value="previous_work" className="h-full overflow-y-auto pr-2">
-                            <h3 className="font-semibold mb-2 text-sm">Previous Work</h3>
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                              {document.previous_work ? (
-                                <MarkdownRenderer content={document.previous_work} />
-                              ) : (
-                                <p>No previous work information available.</p>
-                              )}
-                            </div>
-                          </TabsContent>
-                          <TabsContent value="hypothesis" className="h-full overflow-y-auto pr-2">
-                            <h3 className="font-semibold mb-2 text-sm">Hypothesis</h3>
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                              {document.hypothesis ? (
-                                <MarkdownRenderer content={document.hypothesis} />
-                              ) : (
-                                <p>No hypothesis information available.</p>
-                              )}
-                            </div>
-                          </TabsContent>
-                          <TabsContent value="distinction" className="h-full overflow-y-auto pr-2">
-                            <h3 className="font-semibold mb-2 text-sm">Distinction</h3>
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                              {document.distinction ? (
-                                <MarkdownRenderer content={document.distinction} />
-                              ) : (
-                                <p>No distinction information available.</p>
-                              )}
-                            </div>
-                          </TabsContent>
-                          <TabsContent value="methodology" className="h-full overflow-y-auto pr-2">
-                            <h3 className="font-semibold mb-2 text-sm">Methodology</h3>
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                              {document.methodology ? (
-                                <MarkdownRenderer content={document.methodology} />
-                              ) : (
-                                <p>No methodology information available.</p>
-                              )}
-                            </div>
-                          </TabsContent>
-                          <TabsContent value="results" className="h-full overflow-y-auto pr-2">
-                            <h3 className="font-semibold mb-2 text-sm">Results</h3>
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                              {document.results ? (
-                                <MarkdownRenderer content={document.results} />
-                              ) : (
-                                <p>No results information available.</p>
-                              )}
-                            </div>
-                          </TabsContent>
-                          <TabsContent value="limitations" className="h-full overflow-y-auto pr-2">
-                            <h3 className="font-semibold mb-2 text-sm">Limitations</h3>
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                              {document.limitations ? (
-                                <MarkdownRenderer content={document.limitations} />
-                              ) : (
-                                <p>No limitations information available.</p>
-                              )}
-                            </div>
-                          </TabsContent>
-                          <TabsContent value="implications" className="h-full overflow-y-auto pr-2">
-                            <h3 className="font-semibold mb-2 text-sm">Implications</h3>
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                              {document.implications ? (
-                                <MarkdownRenderer content={document.implications} />
-                              ) : (
-                                <p>No implications information available.</p>
-                              )}
-                            </div>
-                          </TabsContent>
-                        </div>
-                      </Tabs>
+                      </div>
                     </Card>
                   </Allotment.Pane>
                   

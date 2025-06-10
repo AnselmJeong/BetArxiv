@@ -24,7 +24,7 @@ export function DocumentCard({ document, index = 0, onClick }: DocumentCardProps
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
-  const thumbnailUrl = `/api/documents/${document.id}/thumbnail?width=480&height=320`;
+  const thumbnailUrl = `http://localhost:8001/api/documents/${document.id}/thumbnail?width=480&height=320`;
 
   const handleImageLoad = () => {
     setImageLoading(false);

@@ -5,36 +5,20 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "aiohttp>=3.12.4",
-    "anyio>=4.9.0",
     "arxiv>=2.2.0",
-    "docling",
-    "fastapi[all]",
+    "fastapi[standard]",
     "google-genai",
-    "google-generativeai>=0.8.5",
     "httpx>=0.28.1",
     "numpy",
     "pdf2image>=1.17.0",
     "pgvector",
     "pillow>=11.2.1",
     "psycopg[binary]",
-    "pydantic",
-    "pypdf>=5.6.0",
-    "python-dotenv",
-    "twisted>=24.11.0",
-    "uvicorn>=0.34.3",
+    "python-dotenv"
 ]
 
 [build-system]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.uv]
-dev-dependencies = [
-    "pytest-asyncio>=1.0.0",
-    "pytest-cov>=6.1.1",
-    "pytest-tornasync>=0.6.0.post2",
-    "pytest-trio>=0.8.0",
-    "pytest-twisted>=1.14.3",
-    "pytest>=8.3.5"
-]
+

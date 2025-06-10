@@ -5,9 +5,9 @@ const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:80
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
   const searchParams = request.nextUrl.searchParams;
   const width = searchParams.get('width');
   const height = searchParams.get('height');
