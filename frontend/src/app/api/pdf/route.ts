@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Forward the request to the FastAPI backend
-    const backendUrl = new URL('/pdf', BACKEND_BASE_URL);
+    const backendUrl = new URL('/api/pdf', BACKEND_BASE_URL);
     backendUrl.searchParams.set('path', path);
     
     // Include base_dir parameter if provided

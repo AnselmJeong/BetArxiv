@@ -50,8 +50,9 @@ def get_router(db: Database):
     ):
         """Serve PDF files from the local file system."""
         try:
-            # Use the provided base directory or fallback to default
-            base_directory = Path(base_dir).resolve()
+            # In Docker, always use /app/docs regardless of base_dir parameter
+            # The host path gets mounted to /app/docs inside the container
+            base_directory = Path("/app/docs").resolve()
 
             # Handle path - assume it's always relative to base directory
             relative_path = Path(path)

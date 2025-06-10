@@ -131,7 +131,6 @@ function PapersPageContent() {
         }
         
         const data: DocumentsResponse = await response.json();
-        console.log('API Response data:', data);
         setPapers(data.documents);
         setTotalDocuments(data.total);
       } catch (err) {
@@ -241,8 +240,6 @@ function PapersPageContent() {
 
   // Handle sorting
   const handleSort = (field: SortField) => {
-    console.log('Sorting clicked:', field);
-    
     if (sortField === field) {
       // If clicking the same field, toggle order
       const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
@@ -318,13 +315,6 @@ function PapersPageContent() {
 
   // Generate external link based on DOI or ArXiv ID
   const getExternalLink = (paper: Document): { url: string; label: string } | null => {
-    // Debug logging
-    console.log(`Paper ${paper.title}:`, {
-      doi: paper.doi,
-      arxiv_id: paper.arxiv_id,
-      url: paper.url
-    });
-    
     if (paper.doi && paper.doi.trim()) {
       return {
         url: `https://doi.org/${paper.doi.trim()}`,
@@ -461,7 +451,6 @@ function PapersPageContent() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('Title button clicked!');
                       handleSort('title');
                     }}
                   >
@@ -476,7 +465,6 @@ function PapersPageContent() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('Author button clicked!');
                       handleSort('author');
                     }}
                   >
@@ -491,7 +479,6 @@ function PapersPageContent() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('Journal button clicked!');
                       handleSort('journal');
                     }}
                   >
@@ -506,7 +493,6 @@ function PapersPageContent() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('Year button clicked!');
                       handleSort('year');
                     }}
                   >
