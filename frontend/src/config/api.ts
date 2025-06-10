@@ -1,7 +1,11 @@
 // API Configuration
 export const API_CONFIG = {
-  // Base URL for the FastAPI backend (Direct connection to backend)
-  baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001',
+  // Base URL for the FastAPI backend
+  // Server-side: use BACKEND_URL (internal Docker network)
+  // Client-side: use NEXT_PUBLIC_API_URL (external access)
+  baseUrl: (typeof window === 'undefined' 
+    ? process.env.BACKEND_URL 
+    : process.env.NEXT_PUBLIC_API_URL) || 'http://localhost:8001',
   
   // Default request timeout in milliseconds
   timeout: 10000,

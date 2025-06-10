@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Use the base backend URL without /api since we'll add it manually
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+// In Docker: use 'http://backend:8000' (internal network)
+// In development: use 'http://localhost:8001' (host network)
+const BACKEND_BASE_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;

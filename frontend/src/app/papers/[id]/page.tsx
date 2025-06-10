@@ -144,7 +144,7 @@ export default function PaperDetailPage() {
       setBackgroundLoading(true);
       setBackgroundError(null);
       
-      const response = await fetch(`http://localhost:8001/documents/${id}/generate-background`, {
+              const response = await fetch(`http://localhost:8001/api/documents/${id}/generate-background`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

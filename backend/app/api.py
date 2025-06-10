@@ -254,7 +254,7 @@ def get_router(db: Database):
         return await db.get_document_summary(document_id)
 
     @router.post(
-        "/documents/{document_id}/generate-summary", response_model=DocumentSummary
+        "/api/documents/{document_id}/generate-summary", response_model=DocumentSummary
     )
     async def generate_document_summary(
         document_id: UUID = FastAPIPath(...),
@@ -313,7 +313,7 @@ def get_router(db: Database):
                 status_code=500, detail=f"Failed to generate summary: {str(e)}"
             )
 
-    @router.post("/documents/{document_id}/generate-background")
+    @router.post("/api/documents/{document_id}/generate-background")
     async def generate_document_background(
         document_id: UUID = FastAPIPath(...),
     ):
@@ -400,7 +400,7 @@ def get_router(db: Database):
         }
 
     @router.get(
-        "/documents/{document_id}/similar", response_model=SimilarDocumentsResponse
+        "/api/documents/{document_id}/similar", response_model=SimilarDocumentsResponse
     )
     async def find_similar_documents(
         document_id: UUID = FastAPIPath(...),

@@ -132,7 +132,7 @@ class ApiService {
     }
 
     const query = searchParams.toString();
-    const endpoint = `/documents${query ? `?${query}` : ''}`;
+    const endpoint = `/api/documents${query ? `?${query}` : ''}`;
     
     try {
       return await this.request<DocumentsResponse>(endpoint);
@@ -158,26 +158,26 @@ class ApiService {
       return document;
     }
 
-    return this.request<Document>(`/documents/${documentId}`);
+    return this.request<Document>(`/api/documents/${documentId}`);
   }
 
   async getDocumentSummary(documentId: string): Promise<DocumentSummary> {
-    return this.request<DocumentSummary>(`/documents/${documentId}/summary`);
+    return this.request<DocumentSummary>(`/api/documents/${documentId}/summary`);
   }
 
   async getDocumentMetadata(documentId: string): Promise<Document> {
-    return this.request<Document>(`/documents/${documentId}/metadata`);
+    return this.request<Document>(`/api/documents/${documentId}/metadata`);
   }
 
   async updateDocumentSummary(documentId: string, summary: DocumentSummary): Promise<void> {
-    await this.request(`/documents/${documentId}/summary`, {
+    await this.request(`/api/documents/${documentId}/summary`, {
       method: 'PATCH',
       body: JSON.stringify(summary),
     });
   }
 
   async updateDocumentMetadata(documentId: string, metadata: Partial<Document>): Promise<void> {
-    await this.request(`/documents/${documentId}/metadata`, {
+    await this.request(`/api/documents/${documentId}/metadata`, {
       method: 'PATCH',
       body: JSON.stringify(metadata),
     });
@@ -198,7 +198,7 @@ class ApiService {
     }
 
     const query = searchParams.toString();
-    const endpoint = `/documents/search${query ? `?${query}` : ''}`;
+    const endpoint = `/api/documents/search${query ? `?${query}` : ''}`;
     
     const response = await this.request<{results: Document[]}>(endpoint);
     return response.results;
@@ -225,7 +225,7 @@ class ApiService {
     if (params?.folder_name) searchParams.append('folder_name', params.folder_name);
 
     const query = searchParams.toString();
-    const endpoint = `/documents/${documentId}/similar${query ? `?${query}` : ''}`;
+    const endpoint = `/api/documents/${documentId}/similar${query ? `?${query}` : ''}`;
     
     const response = await this.request<{results: SimilarDocument[]}>(endpoint);
     return response.results;
@@ -241,7 +241,7 @@ class ApiService {
     if (request.folder_name) searchParams.append('folder_name', request.folder_name);
 
     const query = searchParams.toString();
-    const endpoint = `/documents/search/keywords${query ? `?${query}` : ''}`;
+    const endpoint = `/api/documents/search/keywords${query ? `?${query}` : ''}`;
     
     const response = await this.request<{results: Document[]}>(endpoint);
     return response.results;
@@ -267,7 +267,7 @@ class ApiService {
     }
 
     const query = searchParams.toString();
-    const endpoint = `/documents/search/combined${query ? `?${query}` : ''}`;
+    const endpoint = `/api/documents/search/combined${query ? `?${query}` : ''}`;
     
     return this.request<Document[]>(endpoint);
   }
@@ -279,7 +279,7 @@ class ApiService {
     }
 
     try {
-      return await this.request<FoldersResponse>('/documents/folders');
+      return await this.request<FoldersResponse>('/api/documents/folders');
     } catch (error) {
       // Return mock data on failure
       return { folders: mockFolders };
@@ -301,7 +301,7 @@ class ApiService {
     if (paperId) searchParams.append('document_id', paperId);
     
     const query = searchParams.toString();
-    const endpoint = `/documents/status${query ? `?${query}` : ''}`;
+    const endpoint = `/api/documents/status${query ? `?${query}` : ''}`;
     
     try {
       return await this.request<ProcessingStatus>(endpoint);
