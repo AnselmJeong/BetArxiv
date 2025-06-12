@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { API_CONFIG } from "@/config/api";
 
 export default function HelpPage() {
   return (
@@ -124,12 +125,12 @@ export default function HelpPage() {
               <h4 className="font-medium mb-2">API 문서</h4>
               <div className="space-y-2">
                 <Button asChild variant="outline" size="sm" className="w-full">
-                  <Link href="http://localhost:8001/docs" target="_blank">
+                  <Link href={`${API_CONFIG.baseUrl}/docs`} target="_blank">
                     Swagger UI 문서
                   </Link>
                 </Button>
                 <Button asChild variant="outline" size="sm" className="w-full">
-                  <Link href="http://localhost:8001/help" target="_blank">
+                  <Link href={`${API_CONFIG.baseUrl}/help`} target="_blank">
                     API 도움말
                   </Link>
                 </Button>

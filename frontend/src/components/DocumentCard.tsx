@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { FileText, Calendar, Users } from "lucide-react"
 import { Document } from "@/types/api"
 import { useState } from "react"
+import { API_CONFIG } from "@/config/api"
 
 interface DocumentCardProps {
   document: Document;
@@ -24,7 +25,7 @@ export function DocumentCard({ document, index = 0, onClick }: DocumentCardProps
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
-  const thumbnailUrl = `http://localhost:8001/api/documents/${document.id}/thumbnail?width=480&height=320`;
+  const thumbnailUrl = `${API_CONFIG.baseUrl}/api/documents/${document.id}/thumbnail?width=480&height=320`;
 
   const handleImageLoad = () => {
     setImageLoading(false);

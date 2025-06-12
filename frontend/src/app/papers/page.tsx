@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/table';
 import { Document, DocumentsResponse } from '@/types/api';
 import { useNavigation } from '@/contexts/navigation-context';
+import { API_CONFIG } from '@/config/api';
 
 interface FolderInfo {
   name: string;
@@ -90,7 +91,7 @@ function PapersPageContent() {
   useEffect(() => {
     const fetchFolders = async () => {
       try {
-        const response = await fetch('http://localhost:8001/api/documents/folders');
+        const response = await fetch(`${API_CONFIG.baseUrl}/api/documents/folders`);
         if (response.ok) {
           const data: FoldersResponse = await response.json();
           setFolders(data.folders);
@@ -124,7 +125,7 @@ function PapersPageContent() {
           params.append('folder_name', selectedFolder);
         }
         
-        const response = await fetch(`http://localhost:8001/api/documents?${params}`);
+        const response = await fetch(`${API_CONFIG.baseUrl}/api/documents?${params}`);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch documents: ${response.status} ${response.statusText}`);

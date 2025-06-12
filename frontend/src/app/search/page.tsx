@@ -15,6 +15,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, ExternalLink, Search, FileText } from 'lucide-react';
 import { SearchResult, SearchResponse, KeywordSearchResponse } from '@/types/api';
+import { API_CONFIG } from '@/config/api';
 
 interface TabState {
   query: string;
@@ -216,7 +217,7 @@ function SearchPageContent() {
     
     try {
       const response = await fetch(
-        `http://localhost:8001/api/documents/search?query=${encodeURIComponent(semanticState.query)}&k=20`,
+        `${API_CONFIG.baseUrl}/api/documents/search?query=${encodeURIComponent(semanticState.query)}&k=20`,
         {
           method: 'GET',
           headers: {
@@ -266,7 +267,7 @@ function SearchPageContent() {
       queryParams.append('include_snippet', 'true');
 
       const response = await fetch(
-        `http://localhost:8001/api/documents/search/keywords?${queryParams.toString()}`,
+        `${API_CONFIG.baseUrl}/api/documents/search/keywords?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -302,7 +303,7 @@ function SearchPageContent() {
     
     try {
       const response = await fetch(
-        `http://localhost:8001/api/documents/search?query=${encodeURIComponent(query)}&k=20`,
+        `${API_CONFIG.baseUrl}/api/documents/search?query=${encodeURIComponent(query)}&k=20`,
         {
           method: 'GET',
           headers: {
@@ -352,7 +353,7 @@ function SearchPageContent() {
       queryParams.append('include_snippet', 'true');
 
       const response = await fetch(
-        `http://localhost:8001/api/documents/search/keywords?${queryParams.toString()}`,
+        `${API_CONFIG.baseUrl}/api/documents/search/keywords?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -483,7 +484,7 @@ function SearchPageContent() {
               {currentState.results.map((result, index) => {
                 const [imageError, setImageError] = useState(false);
                 const [imageLoading, setImageLoading] = useState(true);
-                const thumbnailUrl = `http://localhost:8001/api/documents/${result.id}/thumbnail?width=280&height=200`;
+                const thumbnailUrl = `${API_CONFIG.baseUrl}/api/documents/${result.id}/thumbnail?width=280&height=200`;
 
                 const handleImageLoad = () => setImageLoading(false);
                 const handleImageError = () => {

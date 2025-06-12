@@ -10,6 +10,7 @@ import { ArrowLeft, ExternalLink, Eye, Calendar, Users, BookOpen, Hash, ChevronL
 import ReactMarkdown from 'react-markdown';
 import { Document } from '@/types/api';
 import { useNavigation } from '@/contexts/navigation-context';
+import { API_CONFIG } from '@/config/api';
 
 export default function PaperDetailPage() {
   const { id } = useParams();
@@ -34,7 +35,7 @@ export default function PaperDetailPage() {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`http://localhost:8001/api/documents/${id}`);
+        const response = await fetch(`${API_CONFIG.baseUrl}/api/documents/${id}`);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch paper: ${response.status} ${response.statusText}`);
@@ -144,7 +145,7 @@ export default function PaperDetailPage() {
       setBackgroundLoading(true);
       setBackgroundError(null);
       
-              const response = await fetch(`http://localhost:8001/api/documents/${id}/generate-background`, {
+              const response = await fetch(`${API_CONFIG.baseUrl}/api/documents/${id}/generate-background`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

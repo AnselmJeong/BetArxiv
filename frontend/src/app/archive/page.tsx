@@ -5,6 +5,7 @@ import { Search, FolderOpen, Loader2, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { FoldersResponse } from '@/types/api';
+import { API_CONFIG } from '@/config/api';
 
 interface Folder {
   name: string;
@@ -22,7 +23,7 @@ export default function ArchivePage() {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch('http://localhost:8001/api/documents/folders');
+        const response = await fetch(`${API_CONFIG.baseUrl}/api/documents/folders`);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch folders: ${response.status} ${response.statusText}`);

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Send, Bot, User } from 'lucide-react';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
+import { API_CONFIG } from '@/config/api';
 
 interface ChatMessage {
   id: string;
@@ -38,7 +39,7 @@ export default function ChatBox({ documentId }: ChatBoxProps) {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`http://localhost:8001/api/documents/${documentId}/chat`, {
+      const response = await fetch(`${API_CONFIG.baseUrl}/api/documents/${documentId}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
